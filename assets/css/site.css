@@ -31,25 +31,24 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
 .site-header .shell { border-bottom: 1px solid var(--rule); }
 .header-inner { min-height: 104px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .brand { display: inline-flex; align-items: center; gap: 14px; min-height: 44px; }
-.brand-mark { display: grid; place-items: center; width: 34px; height: 37px; border: 1px solid var(--accent); color: var(--accent); font: 22px/1 var(--serif); transform: rotate(-3deg); }
+.brand-mark { display: grid; place-items: center; width: 34px; height: 37px; border: 1px solid var(--accent); color: var(--accent); font: 22px/1 var(--serif); transform: rotate(-2deg); }
 .brand-name { font: 600 24px/1.6 var(--serif); letter-spacing: .12em; }
 .brand-name small { font: 12px/1.6 var(--sans); color: var(--muted); letter-spacing: .1em; white-space: nowrap; }
-.brand-divider { padding-inline: 14px; font: 16px/1 var(--serif); color: #a79981; }
+.brand-divider { padding-inline: 12px; font: 16px/1 var(--serif); color: var(--accent); }
 .nav-links { display: flex; align-items: center; flex-shrink: 0; gap: 32px; }
 .nav-links a { position: relative; display: flex; align-items: center; min-height: 44px; font-size: 14px; color: var(--muted); }
 .nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--accent); }
-.nav-links a[aria-current="page"]::after { content: ''; position: absolute; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; bottom: 0; left: calc(50% - 2px); }
-.homepage-layout { display: grid; grid-template-columns: minmax(0, 3.2fr) minmax(220px, 1fr); column-gap: 44px; padding-top: 36px; align-items: start; }
+.nav-links a[aria-current="page"]::after { content: ''; position: absolute; width: 14px; height: 2px; background: var(--accent); bottom: 2px; left: calc(50% - 7px); }
+.homepage-layout { display: grid; grid-template-columns: minmax(0, 3.2fr) minmax(220px, 1fr); column-gap: 48px; padding-top: 36px; align-items: start; }
 .primary-column { min-width: 0; }
-.hero { position: relative; min-height: 340px; border-bottom: 1px solid var(--rule); overflow: hidden; }
-.hero-inner { position: relative; z-index: 1; padding: 8px 0 30px; }
+.hero { position: relative; min-height: 316px; border-bottom: 1px solid var(--rule); overflow: hidden; }
+.hero-inner { position: relative; z-index: 1; padding: 12px 0 30px; }
 .eyebrow, .section-kicker { display: block; color: var(--muted); font-size: 12px; line-height: 1.6; letter-spacing: .22em; }
 .eyebrow { display: flex; align-items: center; gap: 13px; }
 .eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--accent); }
-.hero h1 { margin: 24px 0 17px; font: 400 clamp(34px, 3.5vw, 48px)/1.5 var(--serif); letter-spacing: .1em; }
-.hero p { margin: 0; color: var(--muted); font-size: 14px; line-height: 2; letter-spacing: .07em; }
-.hero-caption { display: inline-block; margin-top: 25px; font-size: 11px; line-height: 1.8; color: var(--muted); letter-spacing: .08em; }
-.hero-drawing { position: absolute; width: 310px; height: 282px; right: -10px; top: 28px; color: #a6977c; stroke: currentColor; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; opacity: .64; }
+.hero h1 { margin: 20px 0 17px; font: 400 clamp(34px, 3.5vw, 48px)/1.5 var(--serif); letter-spacing: .1em; }
+.hero p { max-width: 28em; margin: 0; color: var(--muted); font-size: 15px; line-height: 2; letter-spacing: .07em; }
+.hero-drawing { position: absolute; width: 310px; height: 282px; right: -10px; top: 20px; color: #a6977c; stroke: currentColor; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; opacity: .56; }
 .hero-drawing circle { stroke: var(--accent); opacity: .55; }
 .featured-section { margin-top: 32px; }
 .section-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; padding-bottom: 19px; border-bottom: 1px solid var(--rule); }
@@ -63,11 +62,11 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
 .article-card:hover h3, .article-card:hover .article-arrow { color: var(--accent); }
 .article-label { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--muted); font-size: 11px; line-height: 1.5; letter-spacing: .12em; }
 .article-label::before { content: ''; width: 13px; height: 1px; background: #a79981; }
-.article-card h3 { margin: 0 0 10px; font: 600 21px/1.65 var(--serif); overflow-wrap: anywhere; }
-.article-description { margin: 0 0 21px; color: var(--muted); font-size: 13px; line-height: 1.9; }
+.article-card h3 { margin: 0 0 10px; font: 600 22px/1.6 var(--serif); overflow-wrap: anywhere; }
+.article-description { margin: 0 0 21px; color: var(--muted); font-size: 14px; line-height: 1.9; }
 .article-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; font-size: 11px; line-height: 1.7; color: var(--muted); }
 .article-arrow { font-size: 19px; color: var(--muted); }
-.quotes-column { min-width: 0; border-left: 1px solid var(--rule); padding: 8px 0 0 30px; }
+.quotes-column { min-width: 0; border-left: 1px solid var(--rule); padding: 8px 0 0 32px; }
 .quotes-heading h2 { margin: 14px 0 12px; font: 400 25px/1.6 var(--serif); letter-spacing: .16em; }
 .quotes-heading > p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
 #quotes-list { counter-reset: excerpts; }
@@ -152,12 +151,11 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
   .nav-links { gap: 22px; }
   .nav-links a { font-size: 13px; }
   .homepage-layout { padding-top: 24px; row-gap: 32px; }
-  .hero { min-height: 330px; }
+  .hero { min-height: 300px; }
   .hero h1 { margin-top: 24px; font-size: 34px; }
   .hero-inner { padding-bottom: 28px; }
-  .hero p { font-size: 13px; }
-  .hero-caption { font-size: 11px; margin-top: 22px; max-width: 240px; }
-  .hero-drawing { width: 205px; height: 210px; top: 126px; right: -43px; opacity: .38; }
+  .hero p { font-size: 14px; }
+  .hero-drawing { width: 205px; height: 190px; top: 110px; right: -43px; opacity: .38; }
   .featured-section { margin-top: 26px; }
   .section-head { padding-bottom: 14px; }
   .section-head h2 { font-size: 23px; }

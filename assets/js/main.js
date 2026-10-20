@@ -75,7 +75,7 @@
       root.append(back);
       return;
     }
-    document.title = article.title + ' · 子非秋月文案整理';
+    document.title = article.title + ' · 子非秋月 · 为您讲述';
     const head = $('header', 'reader-heading');
     head.append($('span', 'section-kicker', article.type));
     head.append($('h1', 'reader-title', article.title));
