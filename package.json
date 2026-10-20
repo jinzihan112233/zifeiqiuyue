@@ -1,0 +1,15 @@
+{
+  "name": "zifeiqiuyue-literary-mvp",
+  "version": "0.2.0",
+  "private": true,
+  "description": "A buildless reader with Markdown content compiled for offline browsing.",
+  "scripts": {
+    "build": "node scripts/build-content.cjs",
+    "check": "node scripts/build-content.cjs --check",
+    "test": "node --test tests/content.test.cjs"
+  },
+  "devDependencies": {
+    "gray-matter": "4.0.3",
+    "markdown-it": "15.0.3"
+  }
+}

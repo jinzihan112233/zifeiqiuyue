@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" fill="none">
+  <title>远行与长安 · 本站排版示意</title>
+  <desc>浅纸色上以简单墨线描绘远山、城楼和通向远方的道路。</desc>
+  <path fill="#eee5d4" d="M0 0h1200v520H0z"/>
+  <g stroke="#938570" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+    <circle cx="914" cy="118" r="49" stroke="#ac7862"/>
+    <path d="M65 298l111-71 59 37 111-119 100 110 81-49 98 85M704 261l64-44 103 66 111-107 146 131" opacity=".62"/>
+    <path d="M0 344c139-23 206-7 302-35m441 16c154-34 283-7 457 15"/>
+    <path d="M415 520c-2-66 70-99 133-126 55-24 79-49 61-85m136 211c-22-49-81-80-109-103-58-47-46-70-35-108" opacity=".8"/>
+    <path d="M382 291h432M419 291v-59h357v59M475 232v-35h244v35M454 197h287l-34-20H488zM443 232h310l45 17H398z"/>
+    <path d="M573 291v-21a24 24 0 0 1 48 0v21M520 213h18m50 0h18m50 0h18M445 267h23m39 0h23m139 0h23m38 0h23"/>
+    <path d="M55 405h164m-99 16h64m772-40h153m-102 20h68M897 207l14-6 14 6m16-24 12-5 12 5" opacity=".6"/>
+  </g>
+  <path d="M76 68h31v53H76z" stroke="#88473b"/>
+  <text x="91.5" y="90" fill="#88473b" text-anchor="middle" font-family="SimSun,serif" font-size="16">行</text>
+  <text x="91.5" y="110" fill="#88473b" text-anchor="middle" font-family="SimSun,serif" font-size="16">远</text>
+</svg>

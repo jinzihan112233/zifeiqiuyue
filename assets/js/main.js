@@ -22,7 +22,7 @@
       card.append($('h3', '', article.title));
       card.append($('p', 'article-description', article.description));
       const bottom = $('div', 'article-card-bottom');
-      const date = $('time', '', displayDate(article.published) + ' · 演示');
+      const date = $('time', '', displayDate(article.published) + (article.demo ? ' · 演示' : ''));
       date.dateTime = article.published;
       bottom.append(date);
       const arrow = $('span', 'article-arrow', '↗');
@@ -34,8 +34,14 @@
     const quotes = document.getElementById('quotes-list');
     for (const quote of data.quotes) {
       const block = $('blockquote', 'quote-item');
-      block.append($('p', '', quote));
-      block.append($('cite', '', '— 演示摘句'));
+      block.append($('p', '', quote.text));
+      const cite = $('cite', '', '— ' + quote.attribution + (quote.demo ? ' · 演示' : ''));
+      if (quote.articleId || quote.sourceUrl) {
+        const link = $('a', '', cite.textContent);
+        link.href = quote.articleId ? hrefFor({ id: quote.articleId }) : quote.sourceUrl;
+        cite.replaceChildren(link);
+      }
+      block.append(cite);
       quotes.append(block);
     }
   }
@@ -48,7 +54,7 @@
       const content = $('div', 'archive-content');
       content.append($('h2', '', article.title));
       item.append(content);
-      const date = $('time', 'archive-date', displayDate(article.published) + ' · 演示');
+      const date = $('time', 'archive-date', displayDate(article.published) + (article.demo ? ' · 演示' : ''));
       date.dateTime = article.published;
       item.append(date);
       const arrow = $('span', 'archive-arrow', '↗');
@@ -73,13 +79,14 @@
     const head = $('header', 'reader-heading');
     head.append($('span', 'section-kicker', article.type));
     head.append($('h1', 'reader-title', article.title));
-    const date = $('time', 'reader-date', displayDate(article.published) + ' · 示例日期');
+    const date = $('time', 'reader-date', displayDate(article.published) + (article.demo ? ' · 示例日期' : ' · 原视频发布日期'));
     date.dateTime = article.published;
     head.append(date);
-    head.append($('p', 'demo-note', '演示文章 · 以下文字为虚构排版示例，并非子非秋月原文。'));
+    if (article.demo) head.append($('p', 'demo-note', '演示文章 · 以下文字为虚构排版示例，并非子非秋月原文。'));
     root.append(head);
     const body = $('article', 'reader-body');
-    for (const paragraph of article.paragraphs) body.append($('p', '', paragraph));
+    // HTML 只来自关闭原生 HTML 解析的 Markdown 构建，不接收页面输入。
+    body.innerHTML = article.html;
     root.append(body);
     if (article.sourceUrl) {
       const a = $('a', 'reader-source', '原视频来源 ↗');
