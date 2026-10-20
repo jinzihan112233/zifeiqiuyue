@@ -22,8 +22,12 @@
       card.append($('h3', '', article.title));
       card.append($('p', 'article-description', article.description));
       const bottom = $('div', 'article-card-bottom');
-      bottom.append($('time', '', displayDate(article.published)));
-      bottom.append($('span', 'article-arrow', '↗'));
+      const date = $('time', '', displayDate(article.published) + ' · 演示');
+      date.dateTime = article.published;
+      bottom.append(date);
+      const arrow = $('span', 'article-arrow', '↗');
+      arrow.setAttribute('aria-hidden', 'true');
+      bottom.append(arrow);
       card.append(bottom);
       list.append(card);
     }
@@ -44,10 +48,12 @@
       const content = $('div', 'archive-content');
       content.append($('h2', '', article.title));
       item.append(content);
-      const date = $('time', 'archive-date', displayDate(article.published));
+      const date = $('time', 'archive-date', displayDate(article.published) + ' · 演示');
       date.dateTime = article.published;
       item.append(date);
-      item.append($('span', 'archive-arrow', '↗'));
+      const arrow = $('span', 'archive-arrow', '↗');
+      arrow.setAttribute('aria-hidden', 'true');
+      item.append(arrow);
       list.append(item);
     });
   }
@@ -67,9 +73,10 @@
     const head = $('header', 'reader-heading');
     head.append($('span', 'section-kicker', article.type));
     head.append($('h1', 'reader-title', article.title));
-    const date = $('time', 'reader-date', displayDate(article.published) + ' · 演示文章，非原视频转写');
+    const date = $('time', 'reader-date', displayDate(article.published) + ' · 示例日期');
     date.dateTime = article.published;
     head.append(date);
+    head.append($('p', 'demo-note', '演示文章 · 以下文字为虚构排版示例，并非子非秋月原文。'));
     root.append(head);
     const body = $('article', 'reader-body');
     for (const paragraph of article.paragraphs) body.append($('p', '', paragraph));

@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="子非秋月文案整理站静态 MVP 示例：人物与思想的阅读空间。" />
+  <meta name="description" content="一个微古风的纸本文案阅读空间。非官方静态演示，文章、摘句和日期均为演示内容。" />
   <title>首页 · 子非秋月文案整理</title>
   <link rel="stylesheet" href="style.css" />
   <script defer src="data.js"></script>
   <script defer src="main.js"></script>
 </head>
 <body data-page="home">
+  <a class="skip-link" href="#main">跳至正文</a>
   <header class="site-header">
     <div class="shell header-inner">
       <a href="index.html" class="brand" aria-label="返回首页">
-        <span class="brand-mark" aria-hidden="true">字</span>
+        <span class="brand-mark" aria-hidden="true">秋</span>
         <span class="brand-name">子非秋月<span class="brand-divider">/</span><small>文案整理</small></span>
       </a>
       <nav aria-label="主导航" class="nav-links">
@@ -22,23 +23,28 @@
       </nav>
     </div>
   </header>
-  <main class="shell homepage-layout">
+  <noscript><p class="shell script-notice">请启用 JavaScript，以显示文章与摘句。</p></noscript>
+  <main class="shell homepage-layout" id="main">
     <div class="primary-column">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-inner">
-          <span class="eyebrow">A PLACE FOR WORDS & THOUGHTS</span>
-          <h1 id="hero-title">字里行间，<br />与岁月相逢。</h1>
-          <p>读一段人生，问一个问题。<br />把值得回望的文字，留在这里。</p>
-          <span class="hero-caption">子非秋月 · 文案阅读记录</span>
+          <span class="eyebrow">人物 · 思想 · 人间</span>
+          <h1 id="hero-title">借一页文字，<br />与古今相逢。</h1>
+          <p>读一段人生，问一个问题。<br />把故事里的回响，留给此刻的你。</p>
+          <span class="hero-caption">子非秋月文案整理 · 非官方静态演示</span>
         </div>
-        <div class="hero-sun" aria-hidden="true"></div>
-        <div class="hero-hill hero-hill-back" aria-hidden="true"></div>
-        <div class="hero-hill hero-hill-front" aria-hidden="true"></div>
+        <svg class="hero-drawing" viewBox="0 0 330 300" fill="none" aria-hidden="true">
+          <circle cx="219" cy="79" r="43" />
+          <path d="M53 213C88 191 104 179 127 150C143 170 151 184 166 190C184 165 201 134 216 117C240 148 253 163 283 187L323 207" />
+          <path d="M4 240C52 221 79 209 112 201C137 207 147 222 178 226C203 220 218 204 243 204C272 204 293 218 326 226" />
+          <path d="M51 260H197M225 260H288M92 274H246" />
+          <path d="M266 105L279 101L287 106M283 87L293 84L300 88" />
+        </svg>
       </section>
       <section class="featured-section" aria-labelledby="featured-title">
         <div class="section-head">
           <div>
-            <span class="section-kicker">SELECTED READINGS</span>
+            <span class="section-kicker">展卷有期</span>
             <h2 id="featured-title">文章推荐</h2>
           </div>
           <a class="view-all" href="articles.html">查看全部 <span aria-hidden="true">↗</span></a>
@@ -48,14 +54,14 @@
     </div>
     <aside class="quotes-column" aria-labelledby="quotes-title">
       <div class="quotes-heading">
-        <span class="quotes-mark" aria-hidden="true">“</span>
+        <span class="section-kicker">页边小记</span>
         <h2 id="quotes-title">字句拾遗</h2>
-        <p>偶遇一句值得停留的话</p>
+        <p>停一停，读一句。</p>
       </div>
       <div id="quotes-list"></div>
-      <div class="quotes-ending" aria-hidden="true">✦</div>
+      <div class="quotes-ending" aria-hidden="true">拾字 · 留心</div>
     </aside>
   </main>
-  <footer class="site-footer shell"><span>子非秋月 · 文案整理站</span><span>静态原型 · 所有文案与日期均为演示数据</span></footer>
+  <footer class="site-footer shell"><span>子非秋月 · 文案整理</span><span>非官方静态演示 · 正文、摘句与日期均为演示</span><a href="https://space.bilibili.com/11125629" target="_blank" rel="noopener noreferrer">作者 B 站主页 ↗</a></footer>
 </body>
 </html>
