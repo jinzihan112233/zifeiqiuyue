@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="子非秋月文案整理站静态 MVP 示例：人物与思想的阅读空间。" />
+  <title>首页 · 子非秋月文案整理</title>
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="data.js"></script>
+  <script defer src="main.js"></script>
+</head>
+<body data-page="home">
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a href="index.html" class="brand" aria-label="返回首页">
+        <span class="brand-mark" aria-hidden="true">字</span>
+        <span class="brand-name">子非秋月<span class="brand-divider">/</span><small>文案整理</small></span>
+      </a>
+      <nav aria-label="主导航" class="nav-links">
+        <a href="index.html" aria-current="page">首页</a>
+        <a href="articles.html">全部文章</a>
+      </nav>
+    </div>
+  </header>
+  <main class="shell homepage-layout">
+    <div class="primary-column">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-inner">
+          <span class="eyebrow">A PLACE FOR WORDS & THOUGHTS</span>
+          <h1 id="hero-title">字里行间，<br />与岁月相逢。</h1>
+          <p>读一段人生，问一个问题。<br />把值得回望的文字，留在这里。</p>
+          <span class="hero-caption">子非秋月 · 文案阅读记录</span>
+        </div>
+        <div class="hero-sun" aria-hidden="true"></div>
+        <div class="hero-hill hero-hill-back" aria-hidden="true"></div>
+        <div class="hero-hill hero-hill-front" aria-hidden="true"></div>
+      </section>
+      <section class="featured-section" aria-labelledby="featured-title">
+        <div class="section-head">
+          <div>
+            <span class="section-kicker">SELECTED READINGS</span>
+            <h2 id="featured-title">文章推荐</h2>
+          </div>
+          <a class="view-all" href="articles.html">查看全部 <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="featured-grid" id="featured-list"></div>
+      </section>
+    </div>
+    <aside class="quotes-column" aria-labelledby="quotes-title">
+      <div class="quotes-heading">
+        <span class="quotes-mark" aria-hidden="true">“</span>
+        <h2 id="quotes-title">字句拾遗</h2>
+        <p>偶遇一句值得停留的话</p>
+      </div>
+      <div id="quotes-list"></div>
+      <div class="quotes-ending" aria-hidden="true">✦</div>
+    </aside>
+  </main>
+  <footer class="site-footer shell"><span>子非秋月 · 文案整理站</span><span>静态原型 · 所有文案与日期均为演示数据</span></footer>
+</body>
+</html>
