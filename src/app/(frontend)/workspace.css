@@ -5,3 +5,31 @@ select{font:inherit;display:block;width:100%;padding:10px 12px;margin-top:6px;co
 }
 .workspace.account-shell{max-width:900px;min-height:60vh}.workspace .secret-code{font-family:ui-monospace,Consolas,monospace;letter-spacing:.06em;overflow-wrap:anywhere;user-select:all}.account-shell h1{font-size:clamp(28px,4vw,42px)}
 .workspace .desk-filters{display:flex;gap:20px;flex-wrap:wrap}.workspace .desk-filters label{flex:1;min-width:150px}.workspace .comparison>section{min-width:0}.workspace .comparison pre{max-height:65vh;overflow:auto}.workspace .purge-warning{margin-top:24px;padding:20px;border:1px solid var(--accent)}.workspace nav{align-items:center}.workspace .grid>section,.workspace .grid>label{min-width:0}.workspace .prose{max-width:100%;overflow-wrap:anywhere}@media(max-width:760px){.workspace{padding:28px 20px}.workspace input,.workspace textarea{font-size:16px}}
+
+
+/* Editor-specific layout; existing nested .workspace rules are already scoped. */
+.workspace .editor-layout {
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.workspace .editor-layout > label { margin-top: 0; min-width: 0; }
+.workspace .editor-layout > label textarea { min-height: 450px; }
+.workspace .editor-layout > section {
+  min-width: 0;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.workspace .editor-actions {
+  margin-top: 20px;
+  padding-block: 20px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  gap: 12px;
+}
+@media (max-width: 760px) {
+  .workspace .editor-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .workspace .editor-layout > label textarea { min-height: 320px; }
+  .workspace .editor-layout > section { padding: 18px 16px; }
+}

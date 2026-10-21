@@ -41,7 +41,7 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
 .nav-links a[aria-current="page"]::after { content: ''; position: absolute; width: 14px; height: 2px; background: var(--accent); bottom: 2px; left: calc(50% - 7px); }
 .homepage-layout { display: grid; grid-template-columns: minmax(0, 3.2fr) minmax(220px, 1fr); column-gap: 48px; padding-top: 36px; align-items: start; }
 .primary-column { min-width: 0; }
-.hero { position: relative; min-height: 316px; border-bottom: 1px solid var(--rule); overflow: hidden; }
+.hero { position: relative; min-height: 270px; border-bottom: 1px solid var(--rule); overflow: hidden; }
 .hero-inner { position: relative; z-index: 1; padding: 12px 0 30px; }
 .eyebrow, .section-kicker { display: block; color: var(--muted); font-size: 12px; line-height: 1.6; letter-spacing: .22em; }
 .eyebrow { display: flex; align-items: center; gap: 13px; }
@@ -50,13 +50,13 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
 .hero p { max-width: 28em; margin: 0; color: var(--muted); font-size: 15px; line-height: 2; letter-spacing: .07em; }
 .hero-drawing { position: absolute; width: 310px; height: 282px; right: -10px; top: 20px; color: #a6977c; stroke: currentColor; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; opacity: .56; }
 .hero-drawing circle { stroke: var(--accent); opacity: .55; }
-.featured-section { margin-top: 32px; }
+.featured-section { margin-top: 26px; }
 .section-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; padding-bottom: 19px; border-bottom: 1px solid var(--rule); }
 .section-head h2 { margin: 5px 0 0; font: 400 25px/1.6 var(--serif); letter-spacing: .13em; }
 .view-all { display: inline-flex; align-items: center; min-height: 44px; gap: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .view-all:hover { color: var(--accent); }
 .featured-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.article-card { display: flex; flex-direction: column; min-width: 0; min-height: 204px; padding: 25px 25px 23px 0; border-bottom: 1px solid var(--rule); transition: background-color .18s ease; }
+.article-card { display: flex; flex-direction: column; min-width: 0; min-height: 188px; padding: 22px 25px 20px 0; border-bottom: 1px solid var(--rule); transition: background-color .18s ease; }
 .article-card:nth-child(even) { padding-left: 27px; padding-right: 0; border-left: 1px solid var(--rule); }
 .article-card:hover { background-color: rgba(248, 243, 232, .65); }
 .article-card:hover h3, .article-card:hover .article-arrow { color: var(--accent); }
@@ -93,8 +93,8 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
 .reader-title { margin: 17px 0 18px; font: 400 clamp(27px, 3.5vw, 38px)/1.65 var(--serif); letter-spacing: .055em; overflow-wrap: anywhere; }
 .reader-date { color: var(--muted); font-size: 12px; line-height: 1.8; }
 .reader-heading .demo-note { margin-top: 11px; }
-.reader-body { padding-top: 28px; font: 400 18px/2 var(--sans); letter-spacing: .025em; overflow-wrap: anywhere; }
-.reader-body p { margin: 0 0 1.4em; }
+.reader-body { padding-top: 28px; font: 400 18px/1.92 var(--sans); letter-spacing: .025em; overflow-wrap: anywhere; }
+.reader-body p { margin: 0 0 1.25em; }
 .reader-body p:last-child { margin-bottom: 0; }
 .reader-body h1, .reader-body h2, .reader-body h3, .reader-body h4, .reader-body h5, .reader-body h6 { margin: 1.7em 0 .8em; font-family: var(--serif); line-height: 1.65; color: var(--ink); }
 .reader-body > :first-child { margin-top: 0; }
@@ -151,11 +151,11 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
   .nav-links { gap: 22px; }
   .nav-links a { font-size: 13px; }
   .homepage-layout { padding-top: 24px; row-gap: 32px; }
-  .hero { min-height: 300px; }
+  .hero { min-height: 264px; }
   .hero h1 { margin-top: 24px; font-size: 34px; }
   .hero-inner { padding-bottom: 28px; }
   .hero p { font-size: 14px; }
-  .hero-drawing { width: 205px; height: 190px; top: 110px; right: -43px; opacity: .38; }
+  .hero-drawing { width: 205px; height: 190px; top: 88px; right: -43px; opacity: .38; }
   .featured-section { margin-top: 26px; }
   .section-head { padding-bottom: 14px; }
   .section-head h2 { font-size: 23px; }
