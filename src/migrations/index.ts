@@ -4,6 +4,8 @@ import * as migration_20261021_053108_media_origin_index from './20261021_053108
 import * as migration_20261021_103842_invitation_accounts from './20261021_103842_invitation_accounts';
 import * as migration_20261021_104900_account_invariants from './20261021_104900_account_invariants';
 import * as migration_20261021_113451_publication_management from './20261021_113451_publication_management';
+import * as migration_20261021_145839_discussion from './20261021_145839_discussion';
+import * as migration_20261021_153850_annotation_anchors from './20261021_153850_annotation_anchors';
 
 export const migrations = [
   {
@@ -34,6 +36,16 @@ export const migrations = [
   {
     up: migration_20261021_113451_publication_management.up,
     down: migration_20261021_113451_publication_management.down,
-    name: '20261021_113451_publication_management'
+    name: '20261021_113451_publication_management',
+  },
+  {
+    up: migration_20261021_145839_discussion.up,
+    down: migration_20261021_145839_discussion.down,
+    name: '20261021_145839_discussion',
+  },
+  {
+    up: migration_20261021_153850_annotation_anchors.up,
+    down: migration_20261021_153850_annotation_anchors.down,
+    name: '20261021_153850_annotation_anchors'
   },
 ];

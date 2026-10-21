@@ -17,7 +17,7 @@ node_modules/
 *.sql.gz
 *.log
 
-# 后续应用构建产物与检查报告。
+# 应用构建产物与检查报告。
 /.next/
 /out/
 /coverage/

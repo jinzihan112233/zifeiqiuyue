@@ -19,6 +19,6 @@ export default async function Page({ params, searchParams }: Props) {
   const { slug } = await params, { version } = await searchParams;
   const data = await getArticle(slug, version);
   return <div className="shell article-page"><Reader key={data.snapshot.stableId} contentId={String(data.content.id)} initialData={data} articleSlug={slug} version={typeof version === 'string' ? version : undefined} />
-    <details className="version-menu"><summary>发布版本（{data.versions.length}）</summary><ul>{data.versions.map(v => <li key={v.stableId}><a href={`/articles/${slug}?version=${encodeURIComponent(v.stableId)}`} aria-current={data.snapshot.stableId === v.stableId ? 'page' : undefined}><time dateTime={v.publishedAt}>{new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23' }).format(new Date(v.publishedAt))}</time>（北京时间）{data.snapshot.stableId === v.stableId && ' · 正在阅读'}</a></li>)}</ul></details>
+    <details className="version-menu"><summary>发布版本（{data.versions.length}）</summary><ul>{data.versions.map(v => <li key={v.stableId}><a href={`/articles/${slug}?version=${encodeURIComponent(v.stableId)}`} aria-current={data.snapshot.stableId === v.stableId ? 'page' : undefined}><time dateTime={v.publishedAt}>{new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23' }).format(new Date(v.publishedAt))}</time>（北京时间） · {v.annotations} 条可见批注{data.snapshot.stableId === v.stableId && ' · 正在阅读'}</a></li>)}</ul></details>
   </div>;
 }

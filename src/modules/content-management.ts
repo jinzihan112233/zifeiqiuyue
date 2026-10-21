@@ -96,8 +96,9 @@ async function purgeScope(req: PayloadRequest, id: number) {
   const others = [];
   if (ids.length) for (const collection of ['drafts', 'submissions', 'snapshots']) for (const row of await all(payload, collection, { and: [{ content: { not_equals: id } }, { mediaRefs: { in: ids } }] }, req)) others.push({ collection, id: row.id, content: row.content });
   const versions = await txDB(req).execute(sql`SELECT count(*)::int AS count FROM community._drafts_v WHERE version_content_id = ${id}`);
-  const counts = { drafts: drafts.length, versions: versions.rows[0].count, submissions: submissions.length, snapshots: snapshots.length, annotations: annotations.length, quotes: quotes.length, media: ids.length, sharedReferences: others.length };
-  const token = createHash('sha256').update(JSON.stringify({ stableId: content.stableId, updatedAt: content.updatedAt, counts, media: media.map(m => [m.id, m.bodyHash]), drafts: drafts.map(d => [d.id, d.revision]), submissions: submissions.map(s => [s.id, s.status]) })).digest('hex');
+  const comments = await all(payload, 'comments', { content: { equals: id } }, req), reports = await all(payload, 'reports', { content: { equals: id } }, req);
+  const counts = { drafts: drafts.length, versions: versions.rows[0].count, submissions: submissions.length, snapshots: snapshots.length, annotations: annotations.length, comments: comments.length, reports: reports.length, quotes: quotes.length, media: ids.length, sharedReferences: others.length };
+  const token = createHash('sha256').update(JSON.stringify({ stableId: content.stableId, updatedAt: content.updatedAt, counts, comments: comments.map(c => [c.id,c.revision]), reports: reports.map(r => [r.id,r.revision]), media: media.map(m => [m.id, m.bodyHash]), drafts: drafts.map(d => [d.id, d.revision]), submissions: submissions.map(s => [s.id, s.status]) })).digest('hex');
   return { content, media, counts, token };
 }
 export async function purgePreview(payload: Payload, user: Actor, id: number) {
@@ -107,6 +108,8 @@ async function scrub(req: PayloadRequest, id: number, mediaIds: number[]) {
   const db = txDB(req);
   await db.execute(sql`DELETE FROM community._drafts_v WHERE version_content_id=${id}`);
   await db.execute(sql`DELETE FROM community.annotations WHERE content_id=${id}`);
+  await db.execute(sql`UPDATE community.comments SET body='[已清除]',deleted=true,moderation='hidden',request_key=NULL,request_hash=NULL,revision=revision+1 WHERE content_id=${id}`);
+  await db.execute(sql`UPDATE community.reports SET reason='[已清除]',resolution=NULL,status='dismissed',revision=revision+1 WHERE content_id=${id}`);
   await db.execute(sql`UPDATE community.quotes SET text='[已清除]', attribution='[已清除]', source_url=NULL, enabled=false, import_state=NULL WHERE content_id=${id}`);
   await db.execute(sql`DELETE FROM community.home_rels WHERE contents_id=${id}`);
   for (const table of ['drafts', 'submissions', 'snapshots']) {

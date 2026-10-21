@@ -4,6 +4,7 @@ import { currentActor } from '../../../../modules/access';
 import { changeAccount, createInvitation, recover, register, revokeInvitation, sameOrigin } from '../../../../modules/accounts';
 import { positiveId } from '../../../../modules/community';
 import { bodyBytes } from '../../../../modules/http-body';
+import { ownComments } from '../../../../modules/discussion';
 
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -32,8 +33,17 @@ async function route(request: Request, context: { params: Promise<{ action: stri
       }
       if (action === 'activity') {
         const type = params.get('type') || 'drafts';
+        if (type === 'comments') return json(await ownComments(payload, actor, params.get('page')));
         if (!['drafts', 'submissions', 'contents', 'annotations'].includes(type)) throw new APIError('分类无效。', 400);
-        const found = await payload.find({ collection: type, where: { author: { equals: actor.id } }, page, limit: 10, sort: '-updatedAt', depth: 0, overrideAccess: true });
+        const found = await payload.find({ collection: type, where: { and: [{ author: { equals: actor.id } }, ...(type === 'annotations' ? [{ 'content.visibility': { equals: 'public' } }, { 'comment.deleted': { equals: false } }, { 'comment.moderation': { equals: 'visible' } }] : [])] }, page, limit: 10, sort: '-updatedAt', depth: 0, overrideAccess: true });
+        if (type === 'annotations') {
+          const docs = await Promise.all(found.docs.map(async note => {
+            const content = await payload.findByID({ collection: 'contents', id: Number(note.content), depth: 0, overrideAccess: true });
+            const snapshot = await payload.findByID({ collection: 'snapshots', id: Number(note.snapshot), depth: 0, overrideAccess: true });
+            return { id: note.id, quote: note.quote, body: note.body, status: 'public', updatedAt: note.updatedAt, href: `/${content.kind === 'article' ? 'articles' : 'posts'}/${content.slug}?version=${encodeURIComponent(snapshot.stableId)}&annotation=${note.id}&thread=${note.comment}#discussion` };
+          }));
+          return json({ page: found.page, totalPages: found.totalPages, docs });
+        }
         return json({ page: found.page, totalPages: found.totalPages, docs: found.docs.map(doc => ({ id: doc.id, title: doc.title, slug: doc.slug, status: doc.status || doc.visibility, reason: doc.reason, quote: doc.quote, body: doc.body, content: doc.content, updatedAt: doc.updatedAt, href: type === 'contents' && doc.visibility === 'public' ? `/${doc.kind === 'article' ? 'articles' : 'posts'}/${doc.slug}` : type === 'submissions' ? `/workspace/review/${doc.content}?submission=${doc.id}` : `/workspace/edit/${doc.content || doc.id}` })) });
       }
       throw new APIError('操作不存在。', 404);

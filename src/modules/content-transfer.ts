@@ -128,7 +128,7 @@ function validateBundle(bundle: Bundle): Bundle {
     if (q.content && !q.snapshot && !q.content.startsWith('legacy-')) fail('关联金句缺少发布版本。');
   }
   requiredText(bundle.home.introduction, 1000); unique(bundle.home.featured);
-  if (bundle.home.featured.length > 20 || bundle.home.featured.some(id => !bundle.items.some(i => i.stableId === id))) fail('首页推荐引用无效。');
+  if (bundle.home.featured.length > 20 || bundle.home.featured.some(id => !bundle.items.some(i => i.stableId === id && i.kind === 'article'))) fail('首页推荐只能引用包中的站方文章，且不超过 20 项。');
   for (const asset of bundle.media) if (!Buffer.isBuffer(asset.bytes) || asset.bytes.length > 5 * 1024 * 1024 || hash(asset.bytes) !== asset.hash) fail('媒体哈希或体积无效。');
   for (const asset of bundle.media) requiredText(asset.alt, 300);
   return bundle;

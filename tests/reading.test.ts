@@ -79,8 +79,8 @@ test('historical snapshot keeps exact text and annotation; current version remai
   assert.notEqual(old.snapshot.id, current.snapshot.id); assert.equal(old.annotations.length, 1); assert.equal(current.annotations.length, 0);
   const note = old.annotations[0]; assert.equal(Array.from(old.snapshot.plainText).slice(note.start, note.end).join(''), note.quote); assert.equal(old.versions.length, 2);
 });
-test('home preserves curated order and quote links target the quoted stable snapshot', async () => {
-  const home = await readHome(payload); assert.deepEqual(home.featured.map(c => c.slug), samples.slice(0, 4).map(c => c.slug));
+test('home automatically selects the latest four public articles and preserves quote snapshot links', async () => {
+  const home = await readHome(payload); assert.deepEqual(home.featured.map(c => c.slug), [samples[0], ...samples.slice(1).reverse().slice(0, 3)].map(c => c.slug));
   const quote = home.quotes.find(q => q.stableId === `p3-quote-${stamp}`)!;
   assert.equal(quote.href, `/articles/${samples[0].slug}?version=${oldVersion}`); assert.ok(!JSON.stringify(home).includes(secret));
 });
@@ -98,7 +98,7 @@ test('production HTML includes real article text, title, dates, canonical and sa
     const html = await response.text(); assert.ok(html.includes(text), url); assert.ok(!html.includes(secret));
     if (url.includes(samples[0].slug)) { assert.ok(html.includes('reader-body')); assert.ok(html.includes('canonical')); assert.ok(html.includes('2099.12.31')); }
   }
-  const workspace = await request('/workspace'); assert.equal(workspace.status, 200); assert.ok((await workspace.text()).includes('内容工作台'));
+  const workspace = await request('/workspace'); assert.equal(workspace.status, 200); assert.ok((await workspace.text()).includes('发布文章'));
 });
 test('legacy links retain valid IDs; invalid IDs, duplicate parameters and versions return 404', async () => {
   for (const [path, target] of [['/index.html', '/'], ['/articles.html', '/articles'], [`/read.html?id=${samples[0].slug}`, `/articles/${samples[0].slug}`]]) {

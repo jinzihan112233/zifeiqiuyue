@@ -5,8 +5,10 @@ import sharp, { type Metadata as ImageMetadata } from 'sharp';
 import { APIError, createLocalReq, type Payload, type PayloadRequest } from 'payload';
 import { sql } from '@payloadcms/db-postgres';
 import { currentActor, writeContext, type Actor } from './access';
-import { imageIds, renderMarkdown } from './markdown';
+import { imageIds, renderMarkdown, verifyAnnotationText } from './markdown';
 import { metadata, requireArticle, type Metadata } from './content-format';
+import { annotationComment } from './discussion';
+import { textAnchor } from './annotation-text';
 
 type Content = { id: number; slug: string; kind: 'article' | 'post'; author: number; visibility: 'unpublished' | 'public' | 'hidden' | 'purged'; currentSnapshot: number | null };
 type Body = { id: number; author: number; content: number; title: string; markdown: string; metadata: Metadata; mediaIds: number[]; revision: number };
@@ -42,12 +44,13 @@ const isOwner = (actor: Actor, author: number) => {
   if (actor.role !== 'admin' && actor.id !== Number(author)) throw new APIError('没有操作权限。', 403);
 };
 
-export async function transaction<T>(payload: Payload, user: Actor, key: number, run: (req: PayloadRequest, actor: Actor) => Promise<T>, exclusive = false): Promise<T> {
+export async function transaction<T>(payload: Payload, user: Actor, key: number, run: (req: PayloadRequest, actor: Actor) => Promise<T>, exclusive = false, accountLock = false): Promise<T> {
   const id = await payload.db.beginTransaction();
   if (id === null) throw new Error('PostgreSQL transactions are required');
   const req = await createLocalReq({ user, context: writeContext() }, payload);
   req.transactionID = id;
   try {
+    if (accountLock) await txDB(req).execute(sql`SELECT pg_advisory_xact_lock(97124, 0)`);
     // PostgreSQL transaction-scoped locks serialize decisions for one content across processes.
     // This adapter bridge is pinned to Payload 3.91 and covered by real database race tests.
     await txDB(req).execute(exclusive ? sql`SELECT pg_advisory_xact_lock(97125, 0)` : sql`SELECT pg_advisory_xact_lock_shared(97125, 0)`);
@@ -202,13 +205,30 @@ export async function uploadMedia(payload: Payload, user: Actor, bytes: Buffer, 
   return transaction(payload, user, 0, async (req, actor) => payload.create({ collection: 'media', data: { owner: actor.id, alt: requiredText(alt, 300), bodyHash: hash }, file: { data, mimetype: 'image/webp', name: `${crypto.randomUUID()}.webp`, size: data.length }, req, overrideAccess: true, depth: 0 }));
 }
 
-export async function addAnnotation(payload: Payload, user: Actor, input: { snapshot?: unknown; start?: unknown; end?: unknown; quote?: unknown; body?: unknown }) {
-  const snapshotId = positiveId(input.snapshot), snapshot = await getDoc<Snapshot>(payload, 'snapshots', snapshotId);
-  return transaction(payload, user, Number(snapshot.content), async (req, actor) => {
+export async function addAnnotation(payload: Payload, user: Actor, input: { snapshot?: unknown; start?: unknown; end?: unknown; quote?: unknown; body?: unknown; requestKey?: unknown; rendererVersion?: unknown; prefix?: unknown; suffix?: unknown }) {
+  const snapshotId = positiveId(input.snapshot), initial = await getDoc<Snapshot>(payload, 'snapshots', snapshotId);
+  return transaction(payload, user, Number(initial.content), async (req, actor) => {
+    const snapshot = await getDoc<Snapshot & { rendererVersion: string }>(payload, 'snapshots', snapshotId, req);
     const content = await getDoc<Content>(payload, 'contents', Number(snapshot.content), req);
     if (content.visibility !== 'public') throw new APIError('内容不可用。', 404);
-    const start = input.start, end = input.end, chars = Array.from(snapshot.plainText);
-    if (typeof input.quote !== 'string' || !input.quote.trim() || typeof start !== 'number' || typeof end !== 'number' || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > chars.length || chars.slice(start, end).join('') !== input.quote) throw new APIError('选中文字与发布版本不一致，或只包含空白。', 400);
-    return payload.create({ collection: 'annotations', data: { content: content.id, snapshot: snapshotId, author: actor.id, start, end, quote: input.quote, prefix: chars.slice(Math.max(0, start - 24), start).join(''), suffix: chars.slice(end, end + 24).join(''), body: requiredText(input.body, 5000) }, req, overrideAccess: true, depth: 0 });
+    if (input.rendererVersion !== undefined && input.rendererVersion !== snapshot.rendererVersion) throw new APIError('定位规则已变化，请刷新后重新选择文字；保留当前评论输入。', 409);
+    if (input.requestKey !== undefined && (typeof input.requestKey !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(input.requestKey))) throw new APIError('提交标识无效。', 400);
+    const key = input.requestKey ? `${actor.id}:annotation:${input.requestKey}` : undefined;
+    const hash = crypto.createHash('sha256').update(JSON.stringify([snapshotId,input.start,input.end,input.quote,input.body,input.rendererVersion,input.prefix,input.suffix])).digest('hex');
+    if (key) {
+      const prior = await payload.find({ collection: 'comments', where: { requestKey: { equals: key } }, req, overrideAccess: true, depth: 0, limit: 1 });
+      if (prior.docs[0]) {
+        if (prior.docs[0].requestHash !== hash) throw new APIError('提交标识已用于其他批注。', 409);
+        const notes = await payload.find({ collection: 'annotations', where: { comment: { equals: prior.docs[0].id } }, req, overrideAccess: true, depth: 0, limit: 1 });
+        return notes.docs[0];
+      }
+    }
+    let anchor;
+    try { anchor = textAnchor(snapshot.plainText, input.start, input.end, snapshot.rendererVersion); }
+    catch (error) { throw new APIError((error as Error).message, 400); }
+    if (input.quote !== anchor.quote || input.prefix !== undefined && input.prefix !== anchor.prefix || input.suffix !== undefined && input.suffix !== anchor.suffix) throw new APIError('引用或上下文与发布版本不一致。', 400);
+    verifyAnnotationText(snapshot.html, snapshot.plainText, anchor.start, anchor.end);
+    const comment = await annotationComment(req, actor, content.id, input.body, key, hash);
+    return payload.create({ collection: 'annotations', data: { comment: comment.id, content: content.id, snapshot: snapshotId, author: actor.id, ...anchor }, req, overrideAccess: true, depth: 0 });
   });
 }

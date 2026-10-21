@@ -33,3 +33,16 @@ select{font:inherit;display:block;width:100%;padding:10px 12px;margin-top:6px;co
   .workspace .editor-layout > label textarea { min-height: 320px; }
   .workspace .editor-layout > section { padding: 18px 16px; }
 }
+
+.workspace .account-tabs { gap: 24px; border-bottom: 1px solid var(--line); margin-bottom: 28px; }
+.workspace .account-tabs a { padding-block: 12px; color: var(--muted); border-bottom: 2px solid transparent; }
+.workspace .account-tabs a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+.workspace.account-shell { padding-top: 48px; }
+.workspace.account-shell > .eyebrow { display: none; }
+.workspace.account-shell .paper { padding-block: 24px; margin: 0; border-top: 0; }
+.workspace.account-shell .paper + .paper { border-top: 1px solid var(--line); }
+.workspace.account-shell h2 { margin-top: 0; font-size: 22px; }
+.workspace .account-signout { max-width: 480px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+.workspace .account-signout button { border-color: var(--line); color: var(--muted); }
+.workspace.account-shell .rows { margin-top: 24px; }
+.workspace.account-shell .rows strong { font-weight: 500; }

@@ -20,7 +20,7 @@ export function SiteNavigation() {
 
   const accountHref = signedIn ? '/account' : '/login';
   const secondaryLinks = [
-    { href: '/workspace', label: '内容工作台' },
+    { href: '/workspace', label: '发布文章' },
     { href: accountHref, label: signedIn ? '个人中心' : '登录 / 注册' },
   ];
   const current = (href: string) => {

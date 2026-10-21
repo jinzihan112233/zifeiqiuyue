@@ -8,6 +8,7 @@ import { getPayload } from 'payload';
 import { currentActor } from '../src/modules/access';
 import { createContent } from '../src/modules/community';
 import { replayPurges } from '../src/modules/content-management';
+import { annotationTextVersion, textAnchor } from '../src/modules/annotation-text';
 
 async function main() {
   const source = new URL(process.env.DATABASE_TEST_URL!);
@@ -57,9 +58,22 @@ async function main() {
     const probe = await createContent(payload, actor, { slug: `restored-${crypto.randomUUID()}`, title: '恢复后的写入检查', markdown: '独立恢复环境中的合成验证内容。' }); assert.ok(probe.draft.id);
     const annotations = await payload.find({ collection: 'annotations', overrideAccess: true, depth: 0, limit: 10000 });
     for (const note of annotations.docs) {
+      const comment = await payload.findByID({ collection: 'comments', id: Number(note.comment), overrideAccess: true, depth: 0 });
+      assert.equal(Number(comment.content), Number(note.content));
+      if (comment.deleted) { assert.equal(note.quote, '[已删除]'); assert.equal(note.body, ''); continue; }
       const snapshot = await payload.findByID({ collection: 'snapshots', id: Number(note.snapshot), overrideAccess: true, depth: 0 });
       assert.equal(Array.from(String(snapshot.plainText)).slice(Number(note.start), Number(note.end)).join(''), note.quote);
+      assert.ok(snapshot.rendererVersion, 'Snapshot must retain its positioning rules.');
+      if (snapshot.rendererVersion === annotationTextVersion) {
+        const anchor = textAnchor(String(snapshot.plainText), Number(note.start), Number(note.end));
+        assert.equal(anchor.prefix, note.prefix); assert.equal(anchor.suffix, note.suffix);
+      }
     }
+    assert.equal((await payload.db.pool.query(`SELECT count(*)::int AS count FROM community.comments m LEFT JOIN community.comments p ON p.id=m.parent_id
+      WHERE m.parent_id IS NOT NULL AND (p.id IS NULL OR p.content_id<>m.content_id OR m.root_id IS DISTINCT FROM COALESCE(p.root_id,p.id))`)).rows[0].count, 0);
+    const discussionProbe = await payload.find({ collection: 'comments', overrideAccess: true, depth: 0, limit: 1 });
+    assert.ok(discussionProbe.docs.length, 'Run discussion tests before restore verification.');
+    await assert.rejects(() => payload.find({ collection: 'comments', overrideAccess: false }));
     const hidden = await payload.find({ collection: 'contents', where: { visibility: { equals: 'hidden' } }, overrideAccess: true, depth: 0, limit: 1 });
     await assert.rejects(() => payload.findByID({ collection: 'snapshots', id: Number(hidden.docs[0].currentSnapshot), overrideAccess: false }));
   } finally { await payload.destroy(); }

@@ -1,6 +1,7 @@
 {
   "name": "zifeiqiuyue-literary-mvp",
   "version": "0.2.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "engines": { "node": ">=20.19.0" },
@@ -8,7 +9,7 @@
     "sass": "1.106.0",
     "dompurify": "3.4.17"
   },
-  "description": "A buildless reader with Markdown content compiled for offline browsing.",
+  "description": "An offline literary reader and invitation-based community with editorial review.",
   "scripts": {
     "build": "node scripts/build-content.cjs",
     "check": "node scripts/build-content.cjs --check",
@@ -30,6 +31,8 @@
     "content:roundtrip": "node --env-file=.env.local --import tsx scripts/content-roundtrip.ts",
     "test:reading": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/reading.test.ts",
     "test:accounts": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/accounts.test.ts",
+    "test:annotations": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/annotations.test.ts",
+    "test:discussion": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/discussion.test.ts",
     "test:publication": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/publication.test.ts",
     "content:replay-purges": "node --env-file=.env.local --import tsx scripts/replay-purges.ts",
     "content:audit": "node --env-file=.env.local --import tsx scripts/audit-publication.ts"

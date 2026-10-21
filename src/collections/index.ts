@@ -72,7 +72,7 @@ export const Contents: CollectionConfig = {
     const actor = await currentActor(req.payload, req.user, req);
     return actor?.role === 'admin' ? true : actor ? { or: [{ visibility: { equals: 'public' } }, { author: { equals: actor.id } }] } : { visibility: { equals: 'public' } };
   } },
-  fields: [author, { name: 'stableId', type: 'text', required: true, unique: true, defaultValue: () => randomUUID() }, { name: 'kind', type: 'select', required: true, defaultValue: 'post', options: ['article', 'post'], index: true }, { name: 'slug', type: 'text', required: true, unique: true }, { name: 'visibility', type: 'select', options: ['unpublished', 'public', 'hidden', 'purged'], required: true, defaultValue: 'unpublished', index: true }, { name: 'currentSnapshot', type: 'relationship', relationTo: 'snapshots' }, { name: 'importState', type: 'json', access: { read: denied } }],
+  fields: [author, { name: 'discussion', type: 'select', required: true, defaultValue: 'open', options: ['open', 'locked'] }, { name: 'stableId', type: 'text', required: true, unique: true, defaultValue: () => randomUUID() }, { name: 'kind', type: 'select', required: true, defaultValue: 'post', options: ['article', 'post'], index: true }, { name: 'slug', type: 'text', required: true, unique: true }, { name: 'visibility', type: 'select', options: ['unpublished', 'public', 'hidden', 'purged'], required: true, defaultValue: 'unpublished', index: true }, { name: 'currentSnapshot', type: 'relationship', relationTo: 'snapshots' }, { name: 'importState', type: 'json', access: { read: denied } }],
 };
 export const Drafts: CollectionConfig = {
   slug: 'drafts', access: { ...protectedAccess, read: ownerAccess, readVersions: async ({ req }): Promise<boolean | Where> => {
@@ -102,8 +102,15 @@ export const Media: CollectionConfig = {
   fields: [{ name: 'stableId', type: 'text', required: true, unique: true, defaultValue: () => randomUUID() }, { name: 'owner', type: 'relationship', relationTo: 'users', required: true }, { name: 'alt', type: 'text', required: true }, { name: 'bodyHash', type: 'text', required: true }, { name: 'purged', type: 'checkbox', defaultValue: false }, { name: 'origin', type: 'json', access: { read: denied } }],
 };
 export const Annotations: CollectionConfig = {
-  slug: 'annotations', access: { ...protectedAccess, read: async ({ req }) => await adminAccess({ req }) ? true : { 'content.visibility': { equals: 'public' } } }, hooks: protectedHooks,
-  fields: [author, content, { name: 'snapshot', type: 'relationship', relationTo: 'snapshots', required: true }, { name: 'start', type: 'number', required: true }, { name: 'end', type: 'number', required: true }, { name: 'quote', type: 'textarea', required: true }, { name: 'prefix', type: 'text' }, { name: 'suffix', type: 'text' }, { name: 'body', type: 'textarea', required: true, maxLength: 5000 }],
+  indexes: [{ fields: ['snapshot', 'createdAt'] }],
+  slug: 'annotations', access: { ...protectedAccess, read: async ({ req }): Promise<boolean | Where> => await adminAccess({ req }) ? true : { and: [{ 'content.visibility': { equals: 'public' } }, { 'comment.deleted': { equals: false } }, { 'comment.moderation': { equals: 'visible' } }] } },
+  hooks: { ...protectedHooks, afterRead: [async ({ doc, req }) => {
+    const id = typeof doc.comment === 'object' ? doc.comment?.id : doc.comment;
+    const comment = id ? await req.payload.findByID({ collection: 'comments', id, req, overrideAccess: true, depth: 0, disableErrors: true }) : null;
+    doc.body = comment && !comment.deleted && comment.moderation === 'visible' ? comment.body : '';
+    return doc;
+  }] },
+  fields: [author, content, { name: 'comment', type: 'relationship', relationTo: 'comments', required: true, unique: true }, { name: 'snapshot', type: 'relationship', relationTo: 'snapshots', required: true }, { name: 'start', type: 'number', required: true }, { name: 'end', type: 'number', required: true }, { name: 'quote', type: 'textarea', required: true }, { name: 'prefix', type: 'text' }, { name: 'suffix', type: 'text' }, { name: 'body', type: 'textarea', virtual: true }],
 };
 export const Quotes: CollectionConfig = {
   slug: 'quotes', hooks: protectedHooks, access: { ...protectedAccess, read: async ({ req }): Promise<boolean | Where> => await adminAccess({ req }) ? true : { and: [{ enabled: { equals: true } }, { or: [{ content: { exists: false } }, { 'content.visibility': { equals: 'public' } }] }] } },
@@ -135,4 +142,15 @@ export const MediaCleanup: CollectionConfig = {
   slug: 'media-cleanup', admin: { hidden: true }, access: privateAccess, hooks: protectedHooks,
   fields: [{ name: 'media', type: 'relationship', relationTo: 'media', required: true, unique: true }, { name: 'files', type: 'json', required: true }, { name: 'status', type: 'select', options: ['pending', 'done'], defaultValue: 'pending', required: true }, { name: 'error', type: 'text' }],
 };
-export const collections = [Users, Contents, Drafts, Submissions, Snapshots, Media, Annotations, Quotes, Home, Invitations, InvitationUses, AuthLimits, ContentEvents, MediaCleanup];
+// Public discussion reads use a projection so hidden bodies cannot leak through generic CRUD or relationship expansion.
+export const Comments: CollectionConfig = {
+  slug: 'comments', admin: { hidden: true }, access: privateAccess, hooks: protectedHooks,
+  indexes: [{ fields: ['content', 'root', 'createdAt'] }],
+  fields: [author, content, { name: 'parent', type: 'relationship', relationTo: 'comments' }, { name: 'root', type: 'relationship', relationTo: 'comments' }, { name: 'body', type: 'textarea', required: true, maxLength: 5000 }, { name: 'revision', type: 'number', defaultValue: 1, required: true }, { name: 'editedAt', type: 'date' }, { name: 'deleted', type: 'checkbox', defaultValue: false, required: true }, { name: 'moderation', type: 'select', options: ['visible', 'hidden'], defaultValue: 'visible', required: true }, { name: 'requestKey', type: 'text', unique: true }, { name: 'requestHash', type: 'text' }],
+};
+export const Reports: CollectionConfig = {
+  slug: 'reports', admin: { hidden: true }, access: privateAccess, hooks: protectedHooks,
+  indexes: [{ fields: ['status', 'createdAt'] }],
+  fields: [content, { name: 'comment', type: 'relationship', relationTo: 'comments' }, { name: 'reporter', type: 'relationship', relationTo: 'users', required: true }, { name: 'reason', type: 'textarea', required: true, maxLength: 1000 }, { name: 'status', type: 'select', options: ['pending', 'resolved', 'dismissed'], required: true, defaultValue: 'pending' }, { name: 'revision', type: 'number', defaultValue: 1, required: true }, { name: 'resolver', type: 'relationship', relationTo: 'users' }, { name: 'resolution', type: 'text' }, { name: 'resolvedAt', type: 'date' }],
+};
+export const collections = [Users, Contents, Drafts, Submissions, Snapshots, Media, Annotations, Quotes, Home, Invitations, InvitationUses, AuthLimits, ContentEvents, MediaCleanup, Comments, Reports];

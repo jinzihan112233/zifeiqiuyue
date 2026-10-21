@@ -21,5 +21,5 @@ export default buildConfig({
   graphQL: { disable: true },
   typescript: { outputFile: path.resolve('.local/payload-types.ts') },
   telemetry: false,
-  email: () => ({ name: 'disabled', defaultFromAddress: 'no-reply@localhost', defaultFromName: 'P1', sendEmail: async () => { throw new Error('Email is disabled; P1 does not provide email recovery.'); } }),
+  email: () => ({ name: 'disabled', defaultFromAddress: 'no-reply@localhost', defaultFromName: '子非秋月', sendEmail: async () => { throw new Error('Email is disabled; use a recovery code to recover your account.'); } }),
 });

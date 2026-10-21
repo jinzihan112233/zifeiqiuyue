@@ -2,8 +2,24 @@ import crypto from 'node:crypto';
 import MarkdownIt from 'markdown-it';
 import { parseHTML } from 'linkedom';
 import { APIError } from 'payload';
+import { annotationTextVersion } from './annotation-text';
 
-export const rendererVersion = 'p1-markdown-dom-v1';
+export const rendererVersion = annotationTextVersion;
+export function verifyAnnotationText(html: string, plainText: string, start: number, end: number) {
+  const { document } = parseHTML(`<html><body><article>${html}</article></body></html>`), root = document.querySelector('article')!;
+  if (root.textContent !== plainText) throw new APIError('发布版本的正文与定位文本不一致，不能创建批注。', 409);
+  let offset = 0;
+  function visit(node: Node) {
+    if (node.nodeType === 3) { offset += Array.from(node.textContent || '').length; return; }
+    const element = node as Element;
+    if (element.matches?.('img,button,input,textarea,select,form,[data-annotation-exclude]')) {
+      const length = Array.from(element.textContent || '').length;
+      if (length ? start < offset + length && end > offset : start < offset && end > offset) throw new APIError('选区不能跨越图片、按钮或表单。', 400);
+    }
+    for (const child of Array.from(node.childNodes)) visit(child);
+  }
+  visit(root as unknown as Node);
+}
 export function imageIds(markdown: string): number[] {
   const md = new MarkdownIt({ html: false });
   const ids: number[] = [];

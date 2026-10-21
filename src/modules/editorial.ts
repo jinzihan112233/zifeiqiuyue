@@ -35,7 +35,7 @@ export async function saveHome(payload: Payload, user: Actor, input: Record<stri
     if (new Set(featured).size !== featured.length) throw new APIError('推荐不能重复。', 400);
     for (const id of featured) {
       const record = await payload.findByID({ collection: 'contents', id, req, depth: 0, overrideAccess: true });
-      if (record.visibility !== 'public' || !record.currentSnapshot) throw new APIError('推荐只能选择已公开的内容。', 400);
+      if (record.kind !== 'article' || record.visibility !== 'public' || !record.currentSnapshot) throw new APIError('推荐只能选择已公开的站方文章。', 400);
     }
     const data = { key: 'home', introduction: requiredText(input.introduction, 1000), featured };
     const existing = (await payload.find({ collection: 'home', where: { key: { equals: 'home' } }, req, depth: 0, overrideAccess: true })).docs[0];

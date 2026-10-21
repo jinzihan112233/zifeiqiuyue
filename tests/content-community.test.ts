@@ -11,6 +11,7 @@ import { articleFormat, metadata } from '../src/modules/content-format';
 import { defaultMetadata } from '../src/modules/content-types';
 import { addAnnotation, createContent, decideSubmission, saveDraft, setVisibility, submitDraft, uploadMedia, previewDraft } from '../src/modules/community';
 import { publicHome, saveHome, saveQuote } from '../src/modules/editorial';
+import { publicArticle } from '../src/modules/public-reading';
 import { exportBundle, hash, importBundle, mapImages, previewImport, readBundle, readLegacy, sealBundle, writeBundle, type Bundle } from '../src/modules/content-transfer';
 
 let payload: Payload, admin: Actor, editor: Actor, member: Actor;
@@ -78,10 +79,36 @@ test('quotes and recommendations hide together with target, while standalone quo
   await saveHome(payload, editor, { introduction: '首页合成简介', featured: [c.content.id] });
   assert.ok((await publicHome(payload)).quotes.some(q => q.stableId === linked));
   await setVisibility(payload, admin, Number(c.content.id), 'hidden');
-  const home = await publicHome(payload); assert.equal(home.featured.length, 0); assert.ok(!home.quotes.some(q => q.stableId === linked)); assert.ok(home.quotes.some(q => q.stableId === standalone));
+  const home = await publicHome(payload); assert.ok(!home.featured.some(item => item.stableId === c.content.stableId)); assert.ok(!home.quotes.some(q => q.stableId === linked)); assert.ok(home.quotes.some(q => q.stableId === standalone));
   await assert.rejects(() => saveHome(payload, editor, { introduction: '越权推荐', featured: [c.content.id] }), { status: 400 });
   await assert.rejects(() => saveQuote(payload, editor, { stableId: linked, text: '不公开', attribution: '测试', sourceUrl: '', demo: true, order: 1, enabled: true, content: c.content.id, snapshot: c.snapshot.id }), { status: 400 });
 });
+test('homepage recommendations reject public posts and post references in imported bundles', async () => {
+  const post = await createContent(payload, member, { slug: `featured-post-${randomUUID()}`, title: '合成社区帖子', markdown: '自由帖子正文', kind: 'post' });
+  const submission = await submitDraft(payload, member, Number(post.content.id), 1);
+  await decideSubmission(payload, admin, Number(submission.id), 'approved');
+  const before = await publicHome(payload);
+  await assert.rejects(() => saveHome(payload, editor, { introduction: '不能推荐帖子', featured: [post.content.id] }), { status: 400 });
+  assert.deepEqual(await publicHome(payload), before);
+  const bundle = miniBundle(); bundle.items[0].kind = 'post'; bundle.home.featured = [bundle.items[0].stableId];
+  await assert.rejects(() => previewImport(payload, admin, bundle), /首页推荐只能引用包中的站方文章/);
+});
+
+test('post quote links use the formal route and preserve the quoted historical version', async () => {
+  const post = await createContent(payload, member, { slug: `quoted-post-${randomUUID()}`, title: '帖子第一版', markdown: '引用第一版正文', kind: 'post' });
+  const submission = await submitDraft(payload, member, Number(post.content.id), 1);
+  const approved = await decideSubmission(payload, admin, Number(submission.id), 'approved');
+  const stableId = `post-quote-${randomUUID()}`;
+  await saveQuote(payload, editor, { stableId, text: '引用第一版正文', attribution: '合成摘句', sourceUrl: '', demo: true, order: -200, enabled: true, content: post.content.id, snapshot: approved.snapshot!.id });
+  await saveDraft(payload, member, Number(post.content.id), { revision: 1, title: '帖子第二版', markdown: '第二版正文' });
+  const next = await submitDraft(payload, member, Number(post.content.id), 2);
+  await decideSubmission(payload, admin, Number(next.id), 'approved');
+  const quote = (await publicHome(payload)).quotes.find(q => q.stableId === stableId)!;
+  assert.equal(quote.href, `/posts/${post.content.slug}?version=${approved.snapshot!.stableId}`);
+  const version = await publicArticle(payload, String(post.content.slug), String(approved.snapshot!.stableId), 'post');
+  assert.equal(version.snapshot.title, '帖子第一版');
+});
+
 test('legacy preview and local package preserve six original bodies and do not write records or files', async () => {
   const before = { contents: (await payload.count({ collection: 'contents' })).totalDocs, files: fs.readdirSync('storage/test-media') };
   const bundle = await readLegacy(process.cwd()); assert.equal(bundle.items.length, 6); assert.equal(bundle.quotes.length, 3); assert.equal(bundle.media.length, 1);

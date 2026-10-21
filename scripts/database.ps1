@@ -5,7 +5,7 @@ $taskBin = Join-Path $taskRoot '.local/postgres/pgsql/bin'
 $taskData = Join-Path $taskRoot '.local/pgdata'
 $taskPasswordFile = Join-Path $taskRoot '.local/database-password'
 if (-not (Test-Path -LiteralPath (Join-Path $taskBin 'pg_ctl.exe'))) {
-  throw 'PostgreSQL 17 binaries missing. See docs/phase-1-validation.md for .local/postgres/pgsql/bin.'
+  throw 'PostgreSQL 17 binaries missing. See docs/development.md for .local/postgres/pgsql/bin.'
 }
 if ($Action -eq 'stop') {
   if (Test-Path -LiteralPath (Join-Path $taskData 'postmaster.pid')) {

@@ -6,6 +6,8 @@ import { publicHome, requireEditor, saveHome, saveQuote } from '@/modules/editor
 import { pageNumber, publicArchive, publicArticle } from '@/modules/public-reading';
 import { bodyBytes } from '@/modules/http-body';
 import { cleanupMedia, frozenPreview, managementDetail, managementList, purgeContent, purgePreview } from '@/modules/content-management';
+import { addComment, changeComment, discussion, moderate, reports, reportTarget } from '@/modules/discussion';
+import { annotationDetail, annotationList } from '@/modules/annotations';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +20,13 @@ async function handle(request: Request, { params }: { params: Promise<{ action: 
     const actor = await currentActor(payload, auth.user);
     const url = new URL(request.url);
     if (request.method === 'GET') {
+      if (action === 'annotations' || action === 'annotation-detail') {
+        for (const name of ['content','snapshot','page','id']) if (url.searchParams.getAll(name).length > 1) throw new APIError('批注参数无效。', 400);
+        const content = positiveId(url.searchParams.get('content')), snapshot = positiveId(url.searchParams.get('snapshot'));
+        return json(action === 'annotations' ? await annotationList(payload, content, snapshot, url.searchParams.get('page')) : await annotationDetail(payload, content, snapshot, url.searchParams.get('id')));
+      }
+      if (action === 'discussion') return json(await discussion(payload, positiveId(url.searchParams.get('content')), url.searchParams.get('page'), url.searchParams.has('root') ? positiveId(url.searchParams.get('root')) : undefined, actor));
+      if (action === 'reports') { if (!actor) throw new APIError('请先登录。', 401); return json(await reports(payload, actor, url.searchParams.get('page'), url.searchParams.get('status') || 'pending')); }
       if (action === 'home') return json(await publicHome(payload));
       if (action === 'articles') return json(await publicArchive(payload, url.searchParams.getAll('page').length > 1 ? [] : url.searchParams.get('page')));
       if (action === 'posts') return json(await publicArchive(payload, url.searchParams.getAll('page').length > 1 ? [] : url.searchParams.get('page'), 'post'));
@@ -56,8 +65,8 @@ async function handle(request: Request, { params }: { params: Promise<{ action: 
         const snapshotId = positiveId(url.searchParams.get('snapshot') || content.currentSnapshot);
         const snapshot = await payload.findByID({ collection: 'snapshots', id: snapshotId, user: actor, overrideAccess: false, depth: 0, disableErrors: true });
         if (!snapshot || Number(snapshot.content) !== contentId) throw new APIError('版本不可用。', 404);
-        const annotations = await payload.find({ collection: 'annotations', where: { snapshot: { equals: snapshotId } }, user: actor, overrideAccess: false, depth: 0, limit: 100 });
-        return json({ content, snapshot, annotations: annotations.docs });
+        const annotations = content.visibility === 'public' ? await annotationList(payload, contentId, snapshotId) : { items: [], page: 1, pages: 1, total: 0 };
+        return json({ content, snapshot, annotations: annotations.items, annotationPagination: { page: 1, pages: annotations.pages, total: annotations.total } });
       }
       throw new APIError('接口不存在。', 404);
     }
@@ -76,9 +85,18 @@ async function handle(request: Request, { params }: { params: Promise<{ action: 
     try { input = JSON.parse((await bodyBytes(request, 256 * 1024)).toString('utf8')); }
     catch (error) { if (error instanceof APIError) throw error; throw new APIError('请求格式无效。', 400); }
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new APIError('请求格式无效。', 400);
+    if (action === 'comment' && request.method === 'POST') return json(await addComment(payload, actor, input), 201);
+    if (action === 'comment-edit' && request.method === 'POST') return json(await changeComment(payload, actor, positiveId(rawId), input));
+    if (action === 'comment-delete' && request.method === 'POST') return json(await changeComment(payload, actor, positiveId(rawId), input, true));
+    if (action === 'report' && request.method === 'POST') return json(await reportTarget(payload, actor, input));
+    if (action === 'moderate' && request.method === 'POST') return json(await moderate(payload, actor, input));
     if (action === 'content' && request.method === 'POST') return json(await createContent(payload, actor, input), 201);
     if (action === 'preview' && request.method === 'POST') return json(await previewDraft(payload, actor, input.markdown, input.content ? positiveId(input.content) : undefined));
-    if (action === 'annotation' && request.method === 'POST') return json(await addAnnotation(payload, actor, input), 201);
+    if (action === 'annotation' && request.method === 'POST') {
+      if (typeof input.requestKey !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(input.requestKey)) throw new APIError('缺少有效的提交标识。', 400);
+      if (typeof input.rendererVersion !== 'string' || typeof input.prefix !== 'string' || typeof input.suffix !== 'string') throw new APIError('请刷新后重新选择文字；旧版批注表单缺少定位依据，请先保留评论输入。', 409);
+      return json(await addAnnotation(payload, actor, input), 201);
+    }
     if (action === 'quote' && request.method === 'POST') return json(await saveQuote(payload, actor, input));
     if (action === 'home' && request.method === 'POST') return json(await saveHome(payload, actor, input));
     const id = positiveId(rawId);
