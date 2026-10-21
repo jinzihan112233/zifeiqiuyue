@@ -1,2 +1,28 @@
 node_modules/
 .cache/
+
+# 本地环境与认证配置；仅提交不含真实值的模板。
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# 运行时数据、备份与本机辅助文件。
+/uploads/
+/storage/
+/backups/
+/.local/
+*.dump
+*.dump.gz
+*.sql.gz
+*.log
+
+# 后续应用构建产物与检查报告。
+/.next/
+/out/
+/coverage/
+/playwright-report/
+/test-results/
+*.tsbuildinfo
+
+# assets/generated/content.js 是当前离线站必需文件，继续纳入 Git。

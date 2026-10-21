@@ -2,14 +2,58 @@
   "name": "zifeiqiuyue-literary-mvp",
   "version": "0.2.0",
   "private": true,
+  "type": "module",
+  "engines": { "node": ">=20.19.0" },
+  "overrides": {
+    "sass": "1.106.0",
+    "dompurify": "3.4.17"
+  },
   "description": "A buildless reader with Markdown content compiled for offline browsing.",
   "scripts": {
     "build": "node scripts/build-content.cjs",
     "check": "node scripts/build-content.cjs --check",
-    "test": "node --test tests/content.test.cjs"
+    "test": "node --test tests/content.test.cjs",
+    "app:dev": "next dev --webpack --hostname 127.0.0.1",
+    "app:build": "next build --webpack",
+    "app:start": "next start --hostname 127.0.0.1",
+    "app:typecheck": "tsc --noEmit",
+    "app:importmap": "node --env-file=.env.local node_modules/payload/bin.js generate:importmap",
+    "db:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/database.ps1 start",
+    "db:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/database.ps1 stop",
+    "app:seed": "node --env-file=.env.local --import tsx scripts/seed-community.ts",
+    "test:community": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/community.test.ts",
+    "app:migrate": "node --env-file=.env.local --import tsx scripts/migrate-community.ts",
+    "app:restore-check": "node --env-file=.env.local --import tsx scripts/restore-check.ts",
+    "content:backup": "node --env-file=.env.local scripts/backup-content-baseline.cjs",
+    "content:transfer": "node --env-file=.env.local --import tsx scripts/content-transfer.ts",
+    "test:content-community": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/content-community.test.ts",
+    "content:roundtrip": "node --env-file=.env.local --import tsx scripts/content-roundtrip.ts",
+    "test:reading": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/reading.test.ts",
+    "test:accounts": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/accounts.test.ts",
+    "test:publication": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/publication.test.ts",
+    "content:replay-purges": "node --env-file=.env.local --import tsx scripts/replay-purges.ts",
+    "content:audit": "node --env-file=.env.local --import tsx scripts/audit-publication.ts"
   },
   "devDependencies": {
+    "@types/markdown-it": "14.2.0",
+    "@types/node": "24.10.1",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "gray-matter": "4.0.3",
-    "markdown-it": "15.0.3"
+    "markdown-it": "15.0.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@payloadcms/db-postgres": "3.91.0",
+    "@payloadcms/next": "3.91.0",
+    "linkedom": "0.18.12",
+    "next": "16.4.2",
+    "payload": "3.91.0",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "sharp": "0.35.5"
   }
 }

@@ -1,1 +1,2 @@
-assets/generated/content.js text eol=lf
+# 统一文本文件的仓库与检出换行；自动识别的二进制文件保持原字节。
+* text=auto eol=lf
