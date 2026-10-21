@@ -38,11 +38,18 @@ before(async () => {
 });
 after(async () => { if (payload) await payload.destroy(); });
 
-test('article structure validates order, duplicates, empty sections, nesting and code fences', () => {
-  assert.deepEqual(articleFormat(article).issues, []); assert.match(articleFormat(article).summary, /合成简介/); assert.ok(!articleFormat(article).summary.includes('**'));
-  for (const invalid of [article.replace('## 后记', '## 正文'), article.replace('## 简介', '## 正文'), article.replace('## 开头\n\n合成演示开头。', '## 开头'), '# 多余标题\n\n' + article, '额外文字\n\n' + article]) assert.ok(articleFormat(invalid).issues.length);
-  assert.deepEqual(articleFormat(article.replace('### 小标题', '```markdown\n## 后记\n```\n\n### 小标题')).issues, []);
-  assert.throws(() => metadata({ ...defaultMetadata, originalVideoDate: '2026-02-30' })); assert.throws(() => metadata({ ...defaultMetadata, sourceUrl: 'javascript:alert(1)' }));
+test('article needs body only; intro and afterword are optional separate metadata', () => {
+  assert.deepEqual(articleFormat('自由正文，\n\n## 任意章节').issues, []);
+  assert.equal(articleFormat('自由正文。').summary, '');
+  assert.deepEqual(articleFormat('  ').issues, ['文章正文不能为空。']);
+  const intro = metadata({ ...defaultMetadata, intro: '可选简介。\n第二行。', afterword: '可选后记。' });
+  assert.equal(articleFormat('正文。', intro.intro).summary, '可选简介。 第二行。');
+  assert.equal(intro.afterword, '可选后记。');
+  assert.match(articleFormat(article).summary, /合成简介/); // legacy summary
+  assert.throws(() => metadata({ ...defaultMetadata, intro: 'x'.repeat(1001) }));
+  assert.throws(() => metadata({ ...defaultMetadata, afterword: 'x'.repeat(5001) }));
+  assert.throws(() => metadata({ ...defaultMetadata, originalVideoDate: '2026-02-30' }));
+  assert.throws(() => metadata({ ...defaultMetadata, sourceUrl: 'javascript:alert(1)' }));
 });
 test('image mapping preserves prose/code, supports reference images and rejects external images', () => {
   const source = '文字 media:1\n\n![月](media:1 "说明")\n\n![纸][paper]\n\n[paper]: media:2\n\n```\n![代码](media:1)\n```';
@@ -53,7 +60,7 @@ test('image mapping preserves prose/code, supports reference images and rejects 
 });
 test('editorial permissions, invalid draft submission and unrestricted member posts', async () => {
   await assert.rejects(() => createContent(payload, member, { slug: `bad-${randomUUID()}`, title: '越权', markdown: article, kind: 'article' }), { status: 403 });
-  const invalid = await make('原样旧稿，缺少四段'); await assert.rejects(() => submitDraft(payload, editor, Number(invalid.content.id), 1), { status: 400 });
+  const flexible = await make('自由正文，不需要固定章节。'); await submitDraft(payload, editor, Number(flexible.content.id), 1);
   const post = await createContent(payload, member, { slug: `post-${randomUUID()}`, title: '自由帖子', markdown: '不要求四段' });
   await submitDraft(payload, member, Number(post.content.id), 1);
   await assert.rejects(() => saveQuote(payload, member, {}), { status: 403 }); await assert.rejects(() => saveHome(payload, member, {}), { status: 403 });
@@ -68,6 +75,24 @@ test('metadata is frozen with submission; summary and preview share publication 
   assert.equal((await payload.findByID({ collection: 'contents', id, depth: 0 })).stableId, stableId);
   assert.equal((await payload.findByID({ collection: 'contents', id, depth: 0 })).slug, c.content.slug);
   await assert.rejects(() => createContent(payload, editor, { slug: c.content.slug, title: '重复', markdown: article, kind: 'article' }));
+});
+test('optional introduction is frozen and afterword stays separate from annotated body', async () => {
+  const text = '可以单独输入正文，无需开头或后记章节。';
+  const created = await createContent(payload, editor, { slug: 'optional-' + randomUUID(), title: '可选字段测试', markdown: text, kind: 'article', metadata: { ...defaultMetadata, intro: '首页卡片可见的简介', afterword: '正文后的补充说明' } });
+  const id = Number(created.content.id);
+  const submitted = await submitDraft(payload, editor, id, 1);
+  await saveDraft(payload, editor, id, { revision: 1, title: '未发布的新标题', markdown: text, metadata: { ...defaultMetadata, intro: '后来修改的简介', afterword: '' } });
+  const published = await decideSubmission(payload, editor, Number(submitted.id), 'approved');
+  assert.equal(published.snapshot!.summary, '首页卡片可见的简介');
+  assert.equal((published.snapshot!.metadata as Record<string, unknown>).afterword, '正文后的补充说明');
+  assert.equal(published.snapshot!.plainText, text + '\n');
+  const read = await publicArticle(payload, created.content.slug);
+  assert.equal(read.snapshot.metadata.intro, '首页卡片可见的简介');
+  assert.equal(read.snapshot.metadata.afterword, '正文后的补充说明');
+  const empty = await createContent(payload, editor, { slug: 'no-summary-' + randomUUID(), title: '无简介测试', markdown: text, kind: 'article' });
+  const queued = await submitDraft(payload, editor, Number(empty.content.id), 1);
+  const simple = await decideSubmission(payload, editor, Number(queued.id), 'approved');
+  assert.equal(simple.snapshot!.summary, '');
 });
 test('new metadata and article versions preserve old snapshot annotation ranges', async () => {
   const c = await publish(); const text = String(c.snapshot.plainText), chars = Array.from(text), start = chars.indexOf('故'), end = start + 6;
@@ -120,7 +145,7 @@ test('legacy preview and local package preserve synthetic content and do not wri
   const before = { contents: (await payload.count({ collection: 'contents' })).totalDocs, files: fs.readdirSync('storage/test-media') };
   const bundle = await readLegacy(legacyRoot); assert.equal(bundle.items.length, 1); assert.equal(bundle.quotes.length, 1); assert.equal(bundle.media.length, 1);
   assert.equal((await sharp(bundle.media[0].bytes).metadata()).format, 'webp');
-  const p = await previewImport(payload, admin, bundle); assert.equal(p.rows.filter(r => r.type === 'content' && r.warnings.length).length, 1);
+  const p = await previewImport(payload, admin, bundle); assert.equal(p.rows.filter(r => r.type === 'content' && r.warnings.length).length, 0);
   writeBundle(bundle, path.join(root, 'legacy')); const loaded = readBundle(path.join(root, 'legacy'));
   for (let i = 0; i < bundle.items.length; i++) assert.equal(loaded.items[i].work.markdown, bundle.items[i].work.markdown);
   assert.deepEqual(loaded.quotes.map(q => q.text), bundle.quotes.map(q => q.text));

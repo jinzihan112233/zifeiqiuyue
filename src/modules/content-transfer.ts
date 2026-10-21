@@ -114,7 +114,7 @@ function validateBundle(bundle: Bundle): Bundle {
     for (const snapshot of item.snapshots) {
       body(snapshot);
       if (!Number.isFinite(Date.parse(snapshot.publishedAt)) || snapshot.rendererVersion !== rendererVersion) fail('快照日期或渲染版本不支持；禁止猜测旧版本定位。');
-      if (item.kind === 'article' && articleFormat(snapshot.markdown).issues.length) fail('已发布的站方文章不符合四段格式。');
+      if (item.kind === 'article' && articleFormat(snapshot.markdown, snapshot.metadata.intro).issues.length) fail('已发布的站方文章缺少正文。');
       const rendered = renderMarkdown(mapImages(snapshot.markdown, src => `media:${bundle.media.findIndex(m => `asset:${m.stableId}` === src) + 1}`), new Map(bundle.media.map((m, i) => [i + 1, `/asset/${m.stableId}`])));
       if (rendered.plainText !== snapshot.plainText) fail('快照规范文本不一致。');
     }
@@ -312,7 +312,7 @@ export async function importBundle(payload: Payload, user: Actor, bundle: Bundle
           const rendered = renderMarkdown(b.markdown, media);
           if (rendered.plainText !== version.plainText) fail('快照导入后规范文本发生变化。');
           const submission = await payload.create({ collection: 'submissions', req, overrideAccess: true, depth: 0, data: { ...b, content: c!.id, author: actor.id, revision: 1, status: 'approved', reviewer: actor.id, reviewedAt: new Date().toISOString(), reason: '内容归档导入' } });
-          const snapshot = await payload.create({ collection: 'snapshots', req, overrideAccess: true, depth: 0, data: { ...b, ...rendered, content: c!.id, submission: submission.id, stableId: version.stableId, publishedAt: version.publishedAt, summary: item.kind === 'article' ? articleFormat(b.markdown).summary : '' } });
+          const snapshot = await payload.create({ collection: 'snapshots', req, overrideAccess: true, depth: 0, data: { ...b, ...rendered, content: c!.id, submission: submission.id, stableId: version.stableId, publishedAt: version.publishedAt, summary: item.kind === 'article' ? articleFormat(b.markdown, b.metadata.intro).summary : '' } });
           snapshotMap.set(version.stableId, snapshot);
         }
         const pointer = isNew && item.currentSnapshot ? snapshotMap.get(item.currentSnapshot)!.id : c!.currentSnapshot;

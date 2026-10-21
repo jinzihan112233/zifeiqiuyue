@@ -303,3 +303,7 @@ input,textarea,select{max-width:100%;min-width:0}label{display:block;margin:16px
 @media (max-width: 580px) {
   .article-page { width: calc(100% - 40px); }
 }
+
+/* Optional article introduction and afterword remain outside the annotated Markdown body. */
+.reader-optional { margin: 1.5rem auto; max-width: 760px; }
+.reader-optional p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.9; }

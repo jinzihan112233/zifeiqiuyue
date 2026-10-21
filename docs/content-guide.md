@@ -115,14 +115,17 @@ demo: true
 
 ### 2. 文章结构与元数据
 
-站方文章依次且各一次使用顶层二级标题 `开头`、`简介`、`正文`、`后记`，章节不能为空。章节内部使用三级或更低级标题。文章标题在元数据中，不重复放入正文。简介须有文字，列表摘要从简介派生。
+站方文章仅要求标题和非空 Markdown 正文，不再强制含有“开头、简介、正文、后记”四个章节。正文可自由使用 Markdown 标题与分段。
 
-缺少章节仍能保存为草稿，提交和发布会拒绝。社区帖子自由使用 Markdown，不要求四段结构。模板见 [文章模板](templates/community-article.md) 和 [金句模板](templates/community-quote.md)。模板用于示例，实际内容包应由导出命令生成完整清单。
+简介（metadata.intro，最多 1000 字符）和后记（metadata.afterword，最多 5000 字符）在编辑器中是两个独立的可选文本框。简介展示在阅读页正文之前，同时作为首页推荐与全部文章页的摘要；留空时卡片不显示摘要。后记展示在正文之后。两者随工作稿、冻结提交、发布快照和内容包保存，不属于正文批注定位范围。
 
+旧的四章节文章不自动改写；已发布旧版本依然保留正文和历史摘要。社区帖子仍可自由编辑 Markdown。模板见 [文章模板](templates/community-article.md) 和 [金句模板](templates/community-quote.md)。
 | 字段 | 用途 |
 | --- | --- |
 | `title` | 标题，最多 200 字符 |
 | `metadata.category` | 栏目，最多 100 字符 |
+| `metadata.intro` | 简介，可选，最多 1000 字符；用于阅读页及文章列表摘要 |
+| `metadata.afterword` | 后记，可选，最多 5000 字符；置于正文之后 |
 | `metadata.demo` | 是否为演示内容；文章与金句独立维护 |
 | `metadata.sourceUrl` | HTTP(S) 来源链接，没有时为空字符串 |
 | `metadata.originalVideoDate` | 已核验的原视频日期，`YYYY-MM-DD`；未核验时为空 |

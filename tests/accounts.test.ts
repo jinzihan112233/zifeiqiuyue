@@ -182,8 +182,8 @@ test('registration and recovery have their own persisted limits', async () => {
 });
 test('rate counters are shared atomically by independent processes', async () => {
   const key = freshName();
-  const script = `import {getPayload} from 'payload'; import {limit} from './src/modules/accounts.ts'; const {default:config}=await import('./src/payload.config.ts'); const p=await getPayload({config}); let accepted=0; for(let i=0;i<2;i++) {try{await limit(p,${JSON.stringify(key)},3,900); accepted++;}catch(e){if(e.status!==429) throw e;}} console.log(accepted); await p.destroy(); process.exit(0);`;
-  const worker = () => new Promise<number>((resolve, reject) => { const child = spawn(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { env: process.env, windowsHide: true }); let output = ''; child.stdout.on('data', data => output += data); child.on('error', reject); child.on('exit', code => code === 0 ? resolve(Number(output.trim().split('\n').at(-1))) : reject(new Error('Counter worker failed'))); });
+  const script = `import {getPayload} from 'payload'; import {limit} from './src/modules/accounts.ts'; const {default:config}=await import('./src/payload.config.ts'); const p=await getPayload({config}); let accepted=0; for(let i=0;i<2;i++) {try{await limit(p,${JSON.stringify(key)},3,900); accepted++;}catch(e){if(e.status!==429) throw e;}} console.log('RATE_ACCEPTED=' + accepted); await p.destroy(); process.exit(0);`;
+  const worker = () => new Promise<number>((resolve, reject) => { const child = spawn(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { env: process.env, windowsHide: true }); let output = ''; child.stdout.on('data', data => output += data); child.on('error', reject); child.on('exit', code => code === 0 ? resolve(Number(output.match(/RATE_ACCEPTED=(\d+)/)?.[1])) : reject(new Error('Counter worker failed'))); });
   const counts = await Promise.all([worker(), worker()]); assert.equal(counts.reduce((a, b) => a + b, 0), 3); await denied(() => limit(payload, key, 3, 900), [429]);
 });
 test('safe return paths preserve article versions and reject external redirects', () => {

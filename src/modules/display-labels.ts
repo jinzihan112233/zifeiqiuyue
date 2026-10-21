@@ -9,7 +9,7 @@ const labels: Record<string, string> = {
   'discussion:lock': '锁定讨论', 'discussion:unlock': '解锁讨论',
   'discussion:hide-content': '下架内容', 'discussion:restore-content': '恢复内容公开',
   'discussion:ban': '封禁作者', 'discussion:dismiss': '驳回举报',
-  category: '栏目', demo: '演示内容', sourceUrl: '来源链接',
+  category: '栏目', intro: '简介', afterword: '后记', demo: '演示内容', sourceUrl: '来源链接',
   originalVideoDate: '原视频日期', legacyDate: '历史记录日期',
   drafts: '工作稿', versions: '修订版本', submissions: '提交稿', snapshots: '发布快照',
   annotations: '文字批注', comments: '评论', reports: '举报', quotes: '金句',

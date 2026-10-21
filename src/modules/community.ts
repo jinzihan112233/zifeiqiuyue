@@ -142,7 +142,7 @@ export async function submitDraft(payload: Payload, user: Actor, contentId: numb
     const draft = (await payload.find({ collection: 'drafts', where: { content: { equals: contentId } }, depth: 0, overrideAccess: true, req })).docs[0] as unknown as Body;
     if (!draft || draft.revision !== revision) throw new APIError('稿件修订号不一致。', 409);
     if ((await payload.count({ collection: 'submissions', where: { and: [{ content: { equals: contentId } }, { revision: { equals: revision } }] }, req, overrideAccess: true })).totalDocs) throw new APIError('该修订已提交过，请修改并保存新修订后再提交。', 409);
-    if (content.kind === 'article') requireArticle(draft.markdown);
+    if (content.kind === 'article') requireArticle(draft.markdown, metadata(draft.metadata).intro);
     const { ids, manifest } = await mediaFor(payload, actor, draft.markdown, req, draft.mediaIds, content.author);
     const result = await payload.create({ collection: 'submissions', data: { content: contentId, author: content.author, requestKey: key, title: draft.title, markdown: draft.markdown, metadata: metadata(draft.metadata), mediaIds: ids, mediaRefs: ids, mediaManifest: manifest, revision: draft.revision, status: 'pending' }, req, overrideAccess: true, depth: 0 });
     await audit(req, actor, contentId, 'submitted', { target: result.id, delegated: actor.id !== Number(content.author), ...(actor.id !== Number(content.author) ? { reason: requiredText(reason, 1000) } : {}) }); return result;
@@ -173,7 +173,7 @@ export async function decideSubmission(payload: Payload, user: Actor, submission
     await payload.update({ collection: 'submissions', id: submissionId, data: { status: decision, reviewer: actor.id, reason, decisionKey: key, reviewedAt: new Date().toISOString() }, req, overrideAccess: true });
     await audit(req, actor, content.id, decision, { target: submissionId, reason, internalNote, selfPublished: decision === 'approved' && actor.id === Number(content.author), delegated: decision === 'withdrawn' && actor.id !== Number(content.author) });
     if (decision !== 'approved') return { status: decision };
-    const summary = content.kind === 'article' ? requireArticle(submission.markdown) : '';
+    const summary = content.kind === 'article' ? requireArticle(submission.markdown, metadata(submission.metadata).intro) : '';
     const rendered = renderMarkdown(submission.markdown, media);
     const snapshot = await payload.create({ collection: 'snapshots', data: { content: submission.content, submission: submission.id, title: submission.title, markdown: submission.markdown, metadata: metadata(submission.metadata), summary, mediaIds: submission.mediaIds, mediaRefs: submission.mediaIds, mediaManifest: submission.mediaManifest || [], ...rendered }, req, depth: 0, overrideAccess: true });
     await payload.update({ collection: 'contents', id: content.id, data: { currentSnapshot: snapshot.id, visibility: content.visibility === 'hidden' ? 'hidden' : 'public' }, req, overrideAccess: true });
