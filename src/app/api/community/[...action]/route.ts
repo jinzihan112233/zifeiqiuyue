@@ -79,23 +79,23 @@ async function handle(request: Request, { params }: { params: Promise<{ action: 
       const form = await new Response(bytes, { headers: { 'content-type': request.headers.get('content-type') || '' } }).formData();
       const file = form.get('file');
       if (!(file instanceof File)) throw new APIError('请选择图片。', 400);
-      return json(await uploadMedia(payload, actor, Buffer.from(await file.arrayBuffer()), String(form.get('alt') || '')));
+      return json(await uploadMedia(payload, actor, Buffer.from(await file.arrayBuffer()), String(form.get('alt') || ''), request.headers));
     }
     let input: Record<string, unknown>;
     try { input = JSON.parse((await bodyBytes(request, 256 * 1024)).toString('utf8')); }
     catch (error) { if (error instanceof APIError) throw error; throw new APIError('请求格式无效。', 400); }
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new APIError('请求格式无效。', 400);
-    if (action === 'comment' && request.method === 'POST') return json(await addComment(payload, actor, input), 201);
+    if (action === 'comment' && request.method === 'POST') return json(await addComment(payload, actor, input, request.headers), 201);
     if (action === 'comment-edit' && request.method === 'POST') return json(await changeComment(payload, actor, positiveId(rawId), input));
     if (action === 'comment-delete' && request.method === 'POST') return json(await changeComment(payload, actor, positiveId(rawId), input, true));
-    if (action === 'report' && request.method === 'POST') return json(await reportTarget(payload, actor, input));
+    if (action === 'report' && request.method === 'POST') return json(await reportTarget(payload, actor, input, request.headers));
     if (action === 'moderate' && request.method === 'POST') return json(await moderate(payload, actor, input));
     if (action === 'content' && request.method === 'POST') return json(await createContent(payload, actor, input), 201);
     if (action === 'preview' && request.method === 'POST') return json(await previewDraft(payload, actor, input.markdown, input.content ? positiveId(input.content) : undefined));
     if (action === 'annotation' && request.method === 'POST') {
       if (typeof input.requestKey !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(input.requestKey)) throw new APIError('缺少有效的提交标识。', 400);
       if (typeof input.rendererVersion !== 'string' || typeof input.prefix !== 'string' || typeof input.suffix !== 'string') throw new APIError('请刷新后重新选择文字；旧版批注表单缺少定位依据，请先保留评论输入。', 409);
-      return json(await addAnnotation(payload, actor, input), 201);
+      return json(await addAnnotation(payload, actor, input, request.headers), 201);
     }
     if (action === 'quote' && request.method === 'POST') return json(await saveQuote(payload, actor, input));
     if (action === 'home' && request.method === 'POST') return json(await saveHome(payload, actor, input));

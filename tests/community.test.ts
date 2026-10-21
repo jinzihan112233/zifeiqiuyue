@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { after, before, test } from 'node:test';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { Client } from 'pg';
 import { getPayload, jwtSign, type Payload } from 'payload';
@@ -37,6 +37,18 @@ before(async () => {
   editor = (await currentActor(payload, await user('editor')))!;
 });
 after(async () => { server?.kill(); if (payload) await payload.destroy(); });
+
+test('media quota rejects an oversized allocation without leaving records or files', async () => {
+  const prior = process.env.MEDIA_QUOTA_MIB;
+  process.env.MEDIA_QUOTA_MIB = '1';
+  const before = { count: (await payload.count({ collection: 'media', overrideAccess: true })).totalDocs, files: fs.readdirSync(process.env.MEDIA_ROOT!).sort() };
+  try {
+    const bytes = await sharp(randomBytes(1024 * 1024 * 3), { raw: { width: 1024, height: 1024, channels: 3 } }).png().toBuffer();
+    await denied(() => uploadMedia(payload, memberA, bytes, '容量边界测试'), [413]);
+    assert.equal((await payload.count({ collection: 'media', overrideAccess: true })).totalDocs, before.count);
+    assert.deepEqual(fs.readdirSync(process.env.MEDIA_ROOT!).sort(), before.files);
+  } finally { if (prior === undefined) delete process.env.MEDIA_QUOTA_MIB; else process.env.MEDIA_QUOTA_MIB = prior; }
+});
 
 test('application role cannot administer databases or create schema objects', async () => {
   const client = new Client({ connectionString: process.env.DATABASE_URL }); await client.connect();

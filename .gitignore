@@ -19,6 +19,7 @@ node_modules/
 
 # 应用构建产物与检查报告。
 /.next/
+/.next-production/
 /out/
 /coverage/
 /playwright-report/

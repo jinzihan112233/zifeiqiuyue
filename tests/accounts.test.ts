@@ -45,6 +45,18 @@ before(async () => {
 beforeEach(clearLimits);
 after(async () => { server?.kill(); if (payload) { await clearLimits(); await payload.destroy(); } });
 
+test('trusted proxy registration limits are isolated between visitor addresses', async () => {
+  const prior = process.env.TRUSTED_PROXY;
+  process.env.TRUSTED_PROXY = 'cloudflare';
+  try {
+    const first = new Headers({ 'cf-connecting-ip': '203.0.113.10' });
+    for (let i = 0; i < 10; i++) await denied(() => register(payload, {}, first), [400]);
+    await denied(() => register(payload, {}, first), [429]);
+    await denied(() => register(payload, {}, new Headers({ 'cf-connecting-ip': '203.0.113.11' })), [400]);
+    await denied(() => register(payload, {}, new Headers({ 'x-forwarded-for': '203.0.113.12' })), [400]);
+  } finally { if (prior === undefined) delete process.env.TRUSTED_PROXY; else process.env.TRUSTED_PROXY = prior; }
+});
+
 test('registration normalizes names, forces member role and stores only code hashes', async () => {
   const invite = await invitation(), name = freshName(), password = '  密码🌙abcdefgh123  ';
   const result = await register(payload, { username: name.toUpperCase(), nickname: '  一页故事  ', password, confirmPassword: password, invitation: invite.code, role: 'admin', status: 'banned' });

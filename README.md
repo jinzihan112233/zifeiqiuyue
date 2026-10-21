@@ -71,6 +71,7 @@ index.html 等         离线页面入口，保留旧链接
 | 文档 | 内容 |
 | --- | --- |
 | [开发与维护指南](docs/development.md) | 安装、命令、测试、仓库职责和协作 |
+| [本机公网部署](docs/local-deployment.md) | 完整应用的生产环境、Tunnel、私密配置与备份 |
 | [内容维护指南](docs/content-guide.md) | 离线内容、社区格式、媒体和内容包 |
 | [批注与版本阅读](docs/annotation-guide.md) | 规范文本、选字、键盘创建、版本与回退规则 |
 | [建设路线图](docs/community-build-roadmap.md) | 当前进展、阶段任务与待验收项 |

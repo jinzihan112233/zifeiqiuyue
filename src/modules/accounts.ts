@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import { APIError, createLocalReq, loginOperation, refreshOperation, type Payload, type PayloadRequest, type CollectionConfig } from 'payload';
 import { sql } from '@payloadcms/db-postgres';
 import { currentActor, writeContext, type Actor } from './access';
+import { clientAddress } from './deployment';
 
 const derive = promisify(pbkdf2);
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -23,7 +24,6 @@ export function sameOrigin(headers: Headers) {
   if (headers.get('origin') !== new URL(process.env.APP_ORIGIN!).origin) throw new APIError('请从本站提交操作。', 403);
 }
 export async function limit(payload: Payload, key: string, max: number, seconds: number) {
-  // shortcut: local development shares one IP bucket; configure a verified proxy before public deployment.
   const pool = payload.db.pool;
   await pool.query('DELETE FROM community.auth_limits WHERE expires_at < now()');
   const { rows } = await pool.query(`INSERT INTO community.auth_limits (bucket, count, expires_at, created_at, updated_at)
@@ -32,8 +32,8 @@ export async function limit(payload: Payload, key: string, max: number, seconds:
   if (Number(rows[0].count) > max) throw new APIError('尝试过于频繁，请稍后再试。', 429);
 }
 const loginChecked = Symbol('login-checked');
-async function checkLogin(payload: Payload, data: { username?: unknown; password?: unknown }) {
-  await limit(payload, 'login:ip:local', 30, 900);
+async function checkLogin(payload: Payload, data: { username?: unknown; password?: unknown }, headers?: Headers) {
+  await limit(payload, `login:ip:${clientAddress(headers)}`, 30, 900);
   const name = username(data.username);
   await limit(payload, `login:user:${name}`, 10, 900);
   if (typeof data.password !== 'string' || [...data.password].length > 128) throw new APIError('账号或密码错误，或账号暂不可用。', 401);
@@ -41,7 +41,7 @@ async function checkLogin(payload: Payload, data: { username?: unknown; password
 }
 export const loginGuard: NonNullable<CollectionConfig['hooks']>['beforeOperation'] = [async ({ operation, args, req }) => {
   if (operation !== 'login' || req.context.loginChecked === loginChecked) return;
-  await checkLogin(req.payload, (args as { data: { username?: unknown; password?: unknown } }).data);
+  await checkLogin(req.payload, (args as { data: { username?: unknown; password?: unknown } }).data, req.headers);
 }];
 
 async function accountTransaction<T>(payload: Payload, run: (req: PayloadRequest) => Promise<T>, user?: Actor) {
@@ -57,7 +57,7 @@ async function accountTransaction<T>(payload: Payload, run: (req: PayloadRequest
   } catch (error) { await payload.db.rollbackTransaction(id); throw error; }
 }
 export async function signIn(payload: Payload, input: Record<string, unknown>, headers: Headers) {
-  try { await checkLogin(payload, input); }
+  try { await checkLogin(payload, input, headers); }
   catch (error) { const status = (error as { status?: number }).status === 429 ? 429 : 401; throw new APIError(status === 429 ? '尝试过于频繁，请稍后再试。' : '账号或密码错误，或账号暂不可用。', status); }
   const result = await accountTransaction(payload, async req => {
     req.headers = headers;
@@ -117,8 +117,8 @@ export async function revokeInvitation(payload: Payload, user: Actor, id: number
     return { ok: true };
   }, user);
 }
-export async function register(payload: Payload, input: Record<string, unknown>) {
-  await limit(payload, 'register:ip:local', 10, 3600);
+export async function register(payload: Payload, input: Record<string, unknown>, headers?: Headers) {
+  await limit(payload, `register:ip:${clientAddress(headers)}`, 10, 3600);
   const name = username(input.username), nick = nickname(input.nickname), pass = password(input.password);
   if (pass !== input.confirmPassword) throw new APIError('两次输入的密码不一致。', 400);
   if (typeof input.invitation !== 'string' || !/^[\w-]{43}$/.test(input.invitation)) throw new APIError('注册未完成，请检查账号和邀请码。', 400);
@@ -134,8 +134,8 @@ export async function register(payload: Payload, input: Record<string, unknown>)
     return { username: name, recoveryCode: code };
   });
 }
-export async function recover(payload: Payload, input: Record<string, unknown>) {
-  await limit(payload, 'recover:ip:local', 10, 3600);
+export async function recover(payload: Payload, input: Record<string, unknown>, headers?: Headers) {
+  await limit(payload, `recover:ip:${clientAddress(headers)}`, 10, 3600);
   const name = username(input.username); await limit(payload, `recover:user:${name}`, 5, 3600);
   const pass = password(input.password);
   if (pass !== input.confirmPassword) throw new APIError('两次输入的密码不一致。', 400);

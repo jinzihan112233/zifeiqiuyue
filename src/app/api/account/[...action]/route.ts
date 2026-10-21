@@ -51,8 +51,8 @@ async function route(request: Request, context: { params: Promise<{ action: stri
     const raw = (await bodyBytes(request, 8192)).toString('utf8');
     const input = JSON.parse(raw || '{}');
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new APIError('请求无效。', 400);
-    if (action === 'register') return json(await register(payload, input), 201);
-    if (action === 'recover') return json(await recover(payload, input));
+    if (action === 'register') return json(await register(payload, input, request.headers), 201);
+    if (action === 'recover') return json(await recover(payload, input, request.headers));
     if (!actor) throw new APIError('请先登录。', 401);
     if (action === 'invitations') return json(id ? await revokeInvitation(payload, actor, positiveId(id)) : await createInvitation(payload, actor, input));
     if (['nickname', 'password', 'recovery', 'confirm-recovery'].includes(action)) return json(await changeAccount(payload, actor, action, input));

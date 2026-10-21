@@ -5,6 +5,7 @@ import { sql } from '@payloadcms/db-postgres';
 import { currentActor, type Actor } from './access';
 import { audit, positiveId, requiredText, transaction, txDB } from './community';
 import { annotationHref } from './annotation-text';
+import { clientAddress } from './deployment';
 
 type Doc = Record<string, any>;
 const md = new MarkdownIt({ html: false, breaks: true }).disable(['image', 'heading', 'table', 'html_block', 'html_inline']);
@@ -38,13 +39,13 @@ async function quota(req: PayloadRequest, key: string, max: number, seconds: num
     expires_at=CASE WHEN auth_limits.expires_at<=now() THEN EXCLUDED.expires_at ELSE auth_limits.expires_at END,updated_at=now() RETURNING count`);
   if (Number(rows[0].count) > max) throw new APIError('操作过于频繁，请稍后再试。', 429);
 }
-export async function speechQuota(req: PayloadRequest, actor: Actor) {
+export async function speechQuota(req: PayloadRequest, actor: Actor, headers?: Headers) {
   const day = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
   await quota(req, `speech:minute:${actor.id}`, 5, 60);
   await quota(req, `speech:day:${day}:${actor.id}`, 200, 86400);
-  // shortcut: local-only IP bucket; replace with trusted proxy identification before public deployment.
-  await quota(req, 'speech:ip:local:minute', 60, 60);
-  await quota(req, `speech:ip:local:${day}`, 2000, 86400);
+  const ip = clientAddress(headers);
+  await quota(req, `speech:ip:${ip}:minute`, 60, 60);
+  await quota(req, `speech:ip:${ip}:${day}`, 2000, 86400);
 }
 function requestIdentity(actor: Actor, input: Doc) {
   if (typeof input.requestKey !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(input.requestKey)) throw new APIError('缺少有效的提交标识。', 400);
@@ -53,7 +54,7 @@ function requestIdentity(actor: Actor, input: Doc) {
 async function createComment(req: PayloadRequest, actor: Actor, content: number, body: string, parent: number | null, key?: string, hash?: string) {
   return req.payload.create({ collection: 'comments', data: { content, author: actor.id, body, parent, root: parent ? (await doc(req, 'comments', parent)).root || parent : null, requestKey: key, requestHash: hash }, req, overrideAccess: true, depth: 0 });
 }
-export async function addComment(payload: Payload, user: Actor, input: Doc) {
+export async function addComment(payload: Payload, user: Actor, input: Doc, headers?: Headers) {
   const id = positiveId(input.content), body = commentBody(input.body), parent = input.parent == null ? null : positiveId(input.parent);
   const key = requestIdentity(user, input), hash = createHash('sha256').update(JSON.stringify([id, parent, body])).digest('hex');
   return transaction(payload, user, id, async (req, actor) => {
@@ -67,13 +68,13 @@ export async function addComment(payload: Payload, user: Actor, input: Doc) {
       const target = await doc(req, 'comments', parent);
       if (Number(target.content) !== id || target.deleted || target.moderation !== 'visible') throw new APIError('无法回复该评论。', 400);
     }
-    await speechQuota(req, actor);
+    await speechQuota(req, actor, headers);
     const result = await createComment(req, actor, id, body, parent, key, hash);
     return { id: result.id };
   });
 }
-export async function annotationComment(req: PayloadRequest, actor: Actor, content: number, body: unknown, key?: string, hash?: string) {
-  await participating(req, content, true); await speechQuota(req, actor);
+export async function annotationComment(req: PayloadRequest, actor: Actor, content: number, body: unknown, key?: string, hash?: string, headers?: Headers) {
+  await participating(req, content, true); await speechQuota(req, actor, headers);
   return createComment(req, actor, content, commentBody(body), null, key, hash);
 }
 export async function changeComment(payload: Payload, user: Actor, id: number, input: Doc, deleting = false) {
@@ -140,7 +141,7 @@ export async function ownComments(payload: Payload, actor: Actor, pageValue?: un
     return { id: row.id, title: `评论 #${row.id}`, status: row.deleted ? '已删除' : row.moderation === 'hidden' ? '已隐藏' : '公开', body: row.deleted ? '' : row.body, updatedAt: row.updated_at, href: row.version ? annotationHref(path,row.version,Number(row.annotation_id),root,'discussion') : `${path}?thread=${root}#discussion` };
   }) };
 }
-export async function reportTarget(payload: Payload, user: Actor, input: Doc) {
+export async function reportTarget(payload: Payload, user: Actor, input: Doc, headers?: Headers) {
   const content = positiveId(input.content), comment = input.comment == null ? null : positiveId(input.comment), reason = requiredText(input.reason, 1000);
   return transaction(payload, user, content, async (req, actor) => {
     await participating(req, content);
@@ -149,7 +150,7 @@ export async function reportTarget(payload: Payload, user: Actor, input: Doc) {
     const prior = await payload.find({ collection: 'reports', where, req, overrideAccess: true, depth: 0, limit: 1 });
     if (prior.docs[0]) return { ok: true };
     await quota(req, `report:minute:${actor.id}`, 5, 60); await quota(req, `report:day:${actor.id}`, 30, 86400);
-    await quota(req, 'report:ip:local', 60, 60);
+    await quota(req, `report:ip:${clientAddress(headers)}`, 60, 60);
     await payload.create({ collection: 'reports', data: { content, comment, reporter: actor.id, reason }, req, overrideAccess: true });
     return { ok: true };
   });

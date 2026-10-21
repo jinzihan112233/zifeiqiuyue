@@ -4,6 +4,9 @@ import { postgresAdapter } from '@payloadcms/db-postgres';
 import sharp from 'sharp';
 import { collections } from './collections';
 import { assertPurgeLedger } from './modules/content-management';
+import { checkDeployment } from './modules/deployment';
+
+checkDeployment();
 
 const secret = process.env.PAYLOAD_SECRET;
 if (!secret || secret.length < 32) throw new Error('PAYLOAD_SECRET must contain at least 32 random characters.');

@@ -89,6 +89,7 @@ test('banned authors cannot be approved and rollback includes audit records', as
   assert.equal((await payload.findByID({ collection: 'submissions', id: sub.id, overrideAccess: true })).status, 'pending'); assert.equal((await payload.count({ collection: 'snapshots', where: { submission: { equals: sub.id } }, overrideAccess: true })).totalDocs, 0);
 });
 test('management lists paginate in the database and never include another members private work', async () => {
+  for (let i = 0; i < 13; i++) { const created = await create(); await submitDraft(payload, member, Number(created.content.id), 1, randomUUID()); }
   const own = await managementList(payload, other, 'contents', 1); assert.ok(own.items.every((item: any) => item.slug)); assert.ok(own.items.length <= 12);
   const mine = await managementList(payload, member, 'submissions', 1, 'pending', 'post'); assert.ok(mine.items.every((item: any) => item.status === 'pending')); assert.ok(mine.pages > 1);
   await denied(() => managementList(payload, member, 'users', 1));

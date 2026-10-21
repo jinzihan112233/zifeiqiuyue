@@ -9,6 +9,8 @@ import { imageIds, renderMarkdown, verifyAnnotationText } from './markdown';
 import { metadata, requireArticle, type Metadata } from './content-format';
 import { annotationComment } from './discussion';
 import { textAnchor } from './annotation-text';
+import { clientAddress } from './deployment';
+import { limit } from './accounts';
 
 type Content = { id: number; slug: string; kind: 'article' | 'post'; author: number; visibility: 'unpublished' | 'public' | 'hidden' | 'purged'; currentSnapshot: number | null };
 type Body = { id: number; author: number; content: number; title: string; markdown: string; metadata: Metadata; mediaIds: number[]; revision: number };
@@ -192,8 +194,12 @@ export async function setVisibility(payload: Payload, user: Actor, contentId: nu
   });
 }
 
-export async function uploadMedia(payload: Payload, user: Actor, bytes: Buffer, alt: string) {
+export async function uploadMedia(payload: Payload, user: Actor, bytes: Buffer, alt: string, headers?: Headers) {
   if (bytes.length > 5 * 1024 * 1024) throw new APIError('图片不能超过 5 MiB。', 400);
+  if (headers) {
+    await limit(payload, `upload:ip:${clientAddress(headers)}`, 30, 60);
+    await limit(payload, `upload:user:${user.id}`, 10, 60);
+  }
   const source = sharp(bytes, { limitInputPixels: 8192 * 8192 });
   let metadata: ImageMetadata;
   try { metadata = await source.metadata(); } catch { throw new APIError('无法解码图片，请使用有效的 JPEG、PNG 或 WebP。', 400); }
@@ -202,10 +208,21 @@ export async function uploadMedia(payload: Payload, user: Actor, bytes: Buffer, 
   try { data = await source.rotate().webp({ lossless: true }).toBuffer(); } catch { throw new APIError('图片数据不完整或无法转换。', 400); }
   if (data.length > 5 * 1024 * 1024) throw new APIError('转换后的图片超过 5 MiB，请降低尺寸。', 400);
   const hash = crypto.createHash('sha256').update(data).digest('hex');
-  return transaction(payload, user, 0, async (req, actor) => payload.create({ collection: 'media', data: { owner: actor.id, alt: requiredText(alt, 300), bodyHash: hash }, file: { data, mimetype: 'image/webp', name: `${crypto.randomUUID()}.webp`, size: data.length }, req, overrideAccess: true, depth: 0 }));
+  const thumbnail = await sharp(data).resize({ width: 320, withoutEnlargement: true }).webp({ lossless: true }).toBuffer();
+  const quota = Number(process.env.MEDIA_QUOTA_MIB || 100);
+  if (!Number.isSafeInteger(quota) || quota < 1) throw new Error('MEDIA_QUOTA_MIB must be a positive integer.');
+  const root = path.resolve(process.env.MEDIA_ROOT || 'storage/media');
+  fs.mkdirSync(root, { recursive: true });
+  const disk = fs.statfsSync(root);
+  if (disk.bavail * disk.bsize < data.length + thumbnail.length + 128 * 1024 * 1024) throw new APIError('存储空间不足，请联系管理员。', 507);
+  return transaction(payload, user, 0, async (req, actor) => {
+    const { rows: [usage] } = await txDB(req).execute(sql`SELECT COALESCE(sum(COALESCE(filesize,0)+COALESCE(sizes_thumb_filesize,0)),0) AS bytes FROM community.media WHERE owner_id=${actor.id} AND purged=false`);
+    if (Number(usage.bytes) + data.length + thumbnail.length > quota * 1024 * 1024) throw new APIError('图片存储额度不足，请联系管理员。', 413);
+    return payload.create({ collection: 'media', data: { owner: actor.id, alt: requiredText(alt, 300), bodyHash: hash }, file: { data, mimetype: 'image/webp', name: `${crypto.randomUUID()}.webp`, size: data.length }, req, overrideAccess: true, depth: 0 });
+  });
 }
 
-export async function addAnnotation(payload: Payload, user: Actor, input: { snapshot?: unknown; start?: unknown; end?: unknown; quote?: unknown; body?: unknown; requestKey?: unknown; rendererVersion?: unknown; prefix?: unknown; suffix?: unknown }) {
+export async function addAnnotation(payload: Payload, user: Actor, input: { snapshot?: unknown; start?: unknown; end?: unknown; quote?: unknown; body?: unknown; requestKey?: unknown; rendererVersion?: unknown; prefix?: unknown; suffix?: unknown }, headers?: Headers) {
   const snapshotId = positiveId(input.snapshot), initial = await getDoc<Snapshot>(payload, 'snapshots', snapshotId);
   return transaction(payload, user, Number(initial.content), async (req, actor) => {
     const snapshot = await getDoc<Snapshot & { rendererVersion: string }>(payload, 'snapshots', snapshotId, req);
@@ -228,7 +245,7 @@ export async function addAnnotation(payload: Payload, user: Actor, input: { snap
     catch (error) { throw new APIError((error as Error).message, 400); }
     if (input.quote !== anchor.quote || input.prefix !== undefined && input.prefix !== anchor.prefix || input.suffix !== undefined && input.suffix !== anchor.suffix) throw new APIError('引用或上下文与发布版本不一致。', 400);
     verifyAnnotationText(snapshot.html, snapshot.plainText, anchor.start, anchor.end);
-    const comment = await annotationComment(req, actor, content.id, input.body, key, hash);
+    const comment = await annotationComment(req, actor, content.id, input.body, key, hash, headers);
     return payload.create({ collection: 'annotations', data: { comment: comment.id, content: content.id, snapshot: snapshotId, author: actor.id, ...anchor }, req, overrideAccess: true, depth: 0 });
   });
 }
