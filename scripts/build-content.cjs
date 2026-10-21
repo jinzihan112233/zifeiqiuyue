@@ -60,11 +60,10 @@ function loadContent(root = projectRoot) {
     const filename = path.join(articleDirectory, file);
     return compileArticle(fs.readFileSync(filename, 'utf8'), filename, root);
   });
-  assert.ok(articles.length, '至少需要一篇文章');
   const ids = new Set(articles.map(article => article.id));
   assert.equal(ids.size, articles.length, '文章 ID 不能重复');
   const { featuredIds } = JSON.parse(fs.readFileSync(path.join(root, 'content/site.json'), 'utf8'));
-  assert.ok(Array.isArray(featuredIds) && featuredIds.length, '推荐列表不能为空');
+  assert.ok(Array.isArray(featuredIds), '推荐列表须为数组');
   assert.equal(new Set(featuredIds).size, featuredIds.length, '推荐 ID 不能重复');
   for (const id of featuredIds) assert.ok(ids.has(id), `推荐文章不存在：${id}`);
 

@@ -42,8 +42,22 @@ test('元数据、日期和正文缺失时给出构建错误', () => {
 
 test('独立内容文件和生成文件一致，推荐与金句引用均有效', () => {
   const data = loadContent(root);
-  assert.ok(data.articles.some(article => /<img /.test(article.html)), '至少保留一个本地配图示例');
   assert.equal(fs.readFileSync(path.join(root, 'assets/generated/content.js'), 'utf8'), serializeContent(data));
+});
+
+test('空站点允许没有文章、推荐与金句', () => {
+  const cache = path.join(root, '.cache');
+  fs.mkdirSync(cache, { recursive: true });
+  const fixture = fs.mkdtempSync(path.join(cache, 'empty-content-test-'));
+  try {
+    fs.mkdirSync(path.join(fixture, 'content/articles'), { recursive: true });
+    fs.writeFileSync(path.join(fixture, 'content/site.json'), '{"featuredIds":[]}');
+    fs.writeFileSync(path.join(fixture, 'content/quotes.json'), '[]');
+    assert.deepEqual(loadContent(fixture), { articles: [], featuredIds: [], quotes: [] });
+  } finally {
+    assert.ok(path.resolve(fixture).startsWith(path.resolve(cache) + path.sep));
+    fs.rmSync(fixture, { recursive: true });
+  }
 });
 
 test('失效推荐、失效金句关联与重复金句 ID 都会阻止构建', () => {

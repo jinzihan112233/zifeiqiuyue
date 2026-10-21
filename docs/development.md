@@ -22,7 +22,9 @@ npm ci
 npm run db:start
 npm run app:migrate -- --test
 npm run app:migrate
+$env:INITIAL_ADMIN_PASSWORD = '替换为你自己的强密码'
 npm run app:seed
+Remove-Item Env:INITIAL_ADMIN_PASSWORD
 npm run app:importmap
 npm run app:typecheck
 npm run app:build
@@ -39,11 +41,11 @@ npm run app:start
 
 `/lab/read/<数字ID>` 是早期验证保留的兼容阅读入口，通过原有受控 API 读取数据，不代表可绕过公开状态或版本权限。正式文章与帖子分别使用 `/articles/<slug>`、`/posts/<slug>`；评论与回复在阅读页“读后回响”，管理员举报队列在 `/workspace/discussions`，使用说明见 [P6 记录](history/phase-6-validation.md)。关联历史版本统一使用 `?version=<快照稳定ID>`。新页面和首页金句不再生成 `/lab/` 链接。
 
-`app:seed` 准备 admin、editor、membera、memberb、blocked 五个本地验证账号；blocked 为封禁样例。随机密码只保存在 `.local/p1-accounts.json`，这是沿用早期初始化的文件名，不表示应用仍停留在 P1。重复初始化保留原密码；已有账号而凭据文件丢失时脚本会报错，不擅自重置账号。
+`app:seed` 只创建一个启用状态的 `admin` 管理员。首次创建前设置本地环境变量 `INITIAL_ADMIN_PASSWORD`，完成后移除；密码不写入源码或凭据文件。重复初始化保留已有管理员和密码，不添加演示账号。集成测试独立使用专用测试库与 `.local/p1-test-accounts.json` 中的合成账号，不用于开发库初始化。
 
 管理员从 `/account/invitations` 生成邀请码；受邀者在 `/register` 注册并保存恢复码。账号安全设置在 `/account/security`，账号恢复入口为 `/recover`。旧初始化账号首次生成恢复码需验证密码。
 
-新数据库不会自动得到历史测试内容。可按 [内容维护指南](content-guide.md) 显式预览并导入离线演示文章；这些文章缺少四段结构，导入不会补写正文或自动发布。
+仓库不再附带旧演示文章或金句，新数据库默认无内容。可以在工作台创建文章，或按 [内容维护指南](content-guide.md) 显式导入自行准备的内容；导入不会补写正文或自动发布。
 
 ## 日常命令
 
@@ -136,7 +138,7 @@ npm run test:annotations
 4. 检查暂存内容 `git diff --cached`；分享源码使用干净克隆或 Git 跟踪文件，避免把本地运行数据一起压缩上传。
 5. 上传前也检查历史提交中的敏感内容；当前工作树没有秘密不代表历史没有。若曾提交真实密钥，应先轮换，再处理历史。
 
-仓库提供 `.env.example` 变量模板，不包含有效凭据。本地账号文件仍沿用 `p1-accounts.json`，备份/测试输出也可能沿用早期阶段前缀；它们属于私密运行文件，保留名称以兼容已有工具。
+仓库提供 `.env.example` 变量模板，不包含有效凭据。备份与测试输出可能沿用早期阶段前缀；它们属于私密运行文件，不进入 Git。
 
 本项目原创代码、文档与演示内容采用 [MIT 许可证](../LICENSE)。第三方依赖保留各自许可证，真实作者内容及其他第三方材料须另行核对授权，不能沿用本项目或依赖的许可证。
 

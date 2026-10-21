@@ -16,6 +16,7 @@ import { exportBundle, hash, importBundle, mapImages, previewImport, readBundle,
 
 let payload: Payload, admin: Actor, editor: Actor, member: Actor;
 const stamp = randomUUID(), root = path.resolve('.local', `p2-tests-${stamp}`);
+const legacyRoot = path.join(root, 'legacy-source');
 const article = '## 开头\n\n合成演示开头。\n\n## 简介\n\n这是 **合成简介**，带着 🌙。\n\n## 正文\n\n### 小标题\n\n故事有回声。故事有回声。\n\n| 列 | 值 |\n| --- | --- |\n| 月 | 明 |\n\n## 后记\n\n以上不是作者原话。';
 const make = (markdown = article) => createContent(payload, editor, { slug: `p2-${randomUUID()}`, title: '合成站方文章', markdown, kind: 'article', metadata: { ...defaultMetadata, category: '合成栏目', sourceUrl: 'https://example.com/source', originalVideoDate: '2026-01-02' } });
 const publish = async (markdown = article) => { const c = await make(markdown); const s = await submitDraft(payload, editor, Number(c.content.id), 1); const approved = await decideSubmission(payload, editor, Number(s.id), 'approved'); return { ...c, snapshot: approved.snapshot! }; };
@@ -26,6 +27,12 @@ before(async () => {
   process.env.DATABASE_URL = url.toString(); process.env.MEDIA_ROOT = 'storage/test-media';
   const { default: config } = await import('../src/payload.config'); payload = await getPayload({ config });
   await seed(payload, '.local/p1-test-accounts.json'); fs.mkdirSync(root, { recursive: true });
+  fs.mkdirSync(path.join(legacyRoot, 'content/articles'), { recursive: true });
+  fs.mkdirSync(path.join(legacyRoot, 'assets/images'), { recursive: true });
+  fs.copyFileSync('assets/images/libai/road-to-changan.svg', path.join(legacyRoot, 'assets/images/example.svg'));
+  fs.writeFileSync(path.join(legacyRoot, 'content/articles/example.md'), '---\ntitle: 合成迁移稿\npublished: "2026-01-02"\ntype: 测试\ndescription: 迁移验证\nsourceUrl: ""\ndemo: true\n---\n\n合成迁移正文。\n\n![测试图片](../../assets/images/example.svg)\n');
+  fs.writeFileSync(path.join(legacyRoot, 'content/quotes.json'), JSON.stringify([{ id: `legacy-quote-${stamp}`, text: '合成迁移摘句', attribution: '测试', articleId: 'example', sourceUrl: '', demo: true }]));
+  fs.writeFileSync(path.join(legacyRoot, 'content/site.json'), JSON.stringify({ featuredIds: ['example'] }));
   const actor = async (username: string) => (await currentActor(payload, (await payload.find({ collection: 'users', where: { username: { equals: username } }, overrideAccess: true, depth: 0 })).docs[0]))!;
   admin = await actor('admin'); editor = await actor('editor'); member = await actor('membera');
 });
@@ -109,11 +116,11 @@ test('post quote links use the formal route and preserve the quoted historical v
   assert.equal(version.snapshot.title, '帖子第一版');
 });
 
-test('legacy preview and local package preserve six original bodies and do not write records or files', async () => {
+test('legacy preview and local package preserve synthetic content and do not write records or files', async () => {
   const before = { contents: (await payload.count({ collection: 'contents' })).totalDocs, files: fs.readdirSync('storage/test-media') };
-  const bundle = await readLegacy(process.cwd()); assert.equal(bundle.items.length, 6); assert.equal(bundle.quotes.length, 3); assert.equal(bundle.media.length, 1);
+  const bundle = await readLegacy(legacyRoot); assert.equal(bundle.items.length, 1); assert.equal(bundle.quotes.length, 1); assert.equal(bundle.media.length, 1);
   assert.equal((await sharp(bundle.media[0].bytes).metadata()).format, 'webp');
-  const p = await previewImport(payload, admin, bundle); assert.equal(p.rows.filter(r => r.type === 'content' && r.warnings.length).length, 6);
+  const p = await previewImport(payload, admin, bundle); assert.equal(p.rows.filter(r => r.type === 'content' && r.warnings.length).length, 1);
   writeBundle(bundle, path.join(root, 'legacy')); const loaded = readBundle(path.join(root, 'legacy'));
   for (let i = 0; i < bundle.items.length; i++) assert.equal(loaded.items[i].work.markdown, bundle.items[i].work.markdown);
   assert.deepEqual(loaded.quotes.map(q => q.text), bundle.quotes.map(q => q.text));
@@ -163,7 +170,7 @@ test('failed import rolls back database and removes only its own media files', a
 });
 test('legacy import stays unpublished, repeats cleanly, and retains original dates as unverified metadata', async () => {
   await rebaseHome();
-  const bundle = await readLegacy(process.cwd());
+  const bundle = await readLegacy(legacyRoot);
   // Re-running the suite may find already imported legacy records; unchanged records are intentional.
   await apply(bundle); await apply(bundle);
   for (const item of bundle.items) {
