@@ -307,3 +307,11 @@ input,textarea,select{max-width:100%;min-width:0}label{display:block;margin:16px
 /* Optional article introduction and afterword remain outside the annotated Markdown body. */
 .reader-optional { margin: 1.5rem auto; max-width: 760px; }
 .reader-optional p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.9; }
+
+/* Role-linked nickname colors. Permissions are checked server-side. */
+.user-tag--regular { color: #1a1a1a; }
+.user-tag--moon { color: #2563eb; }
+.user-tag--admin { color: #7c3aed; }
+.user-tag--owner { color: #b8860b; }
+.user-tag-name { font-weight: 650; }
+.user-tag-label { font-size: .78em; font-weight: 500; }

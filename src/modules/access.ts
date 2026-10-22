@@ -1,6 +1,7 @@
 import { APIError, type Payload, type PayloadRequest, type Where } from 'payload';
+import type { UserTag } from './user-tags';
 
-export type Actor = { id: number; username: string; nickname: string; role: 'member' | 'editor' | 'admin'; status: 'active' | 'banned'; collection: 'users'; _sid?: string };
+export type Actor = { id: number; username: string; nickname: string; role: 'member' | 'editor' | 'admin'; tag: UserTag; status: 'active' | 'banned'; collection: 'users'; _sid?: string };
 const writeToken = Symbol('community-write');
 export const writeContext = () => ({ communityWrite: writeToken });
 export const isTrustedWrite = (req: PayloadRequest) => req.context.communityWrite === writeToken;

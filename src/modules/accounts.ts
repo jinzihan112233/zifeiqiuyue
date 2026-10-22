@@ -4,6 +4,7 @@ import { APIError, createLocalReq, loginOperation, refreshOperation, type Payloa
 import { sql } from '@payloadcms/db-postgres';
 import { currentActor, writeContext, type Actor } from './access';
 import { clientAddress } from './deployment';
+import { canManageTags, tagRole, userTag, type UserTag } from './user-tags';
 
 const derive = promisify(pbkdf2);
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -103,16 +104,21 @@ async function verifyPassword(req: PayloadRequest, id: number, value: unknown) {
 }
 export async function createInvitation(payload: Payload, user: Actor, input: Record<string, unknown>) {
   const uses = Number(input.maxUses), expires = new Date(String(input.expiresAt));
+  const tag = userTag(input.tag ?? 'regular');
+  if (tag === 'owner') throw new APIError('邀请码不能授予站长身份。', 403);
   if (!Number.isSafeInteger(uses) || uses < 1 || uses > 100 || !Number.isFinite(+expires) || +expires <= Date.now()) throw new APIError('请设置 1–100 次使用次数及未来的有效期。', 400);
   return accountTransaction(payload, async req => {
     const actor = await requireActor(req, user, true), code = secretCode();
-    const invite = await payload.create({ collection: 'invitations', data: { codeHash: digest(code), maxUses: uses, used: 0, expiresAt: expires.toISOString(), revoked: false, creator: actor.id }, req, overrideAccess: true });
+    if (!canManageTags(actor.tag) || tag === 'admin' && actor.tag !== 'owner') throw new APIError('没有授予该 Tag 的权限。', 403);
+    const invite = await payload.create({ collection: 'invitations', data: { codeHash: digest(code), maxUses: uses, used: 0, expiresAt: expires.toISOString(), revoked: false, tag, creator: actor.id }, req, overrideAccess: true });
     return { id: invite.id, code };
   }, user);
 }
 export async function revokeInvitation(payload: Payload, user: Actor, id: number) {
   return accountTransaction(payload, async req => {
-    await requireActor(req, user, true);
+    const actor = await requireActor(req, user, true);
+    const invitation = await payload.findByID({ collection: 'invitations', id, req, overrideAccess: true, depth: 0 });
+    if (actor.tag !== 'owner' && invitation.tag === 'admin') throw new APIError('不能管理管理员邀请码。', 403);
     await payload.update({ collection: 'invitations', id, data: { revoked: true }, req, overrideAccess: true });
     return { ok: true };
   }, user);
@@ -128,7 +134,9 @@ export async function register(payload: Payload, input: Record<string, unknown>,
     if (!invitation || invitation.revoked || +new Date(invitation.expiresAt) <= Date.now() || invitation.used >= invitation.maxUses) throw new APIError('注册未完成，请检查账号和邀请码。', 400);
     if ((await payload.count({ collection: 'users', where: { username: { equals: name } }, req, overrideAccess: true })).totalDocs) throw new APIError('注册未完成，请检查账号和邀请码。', 400);
     const code = secretCode();
-    const user = await payload.create({ collection: 'users', data: { username: name, nickname: nick, password: pass, role: 'member', status: 'active', recoveryHash: digest(code), recoveryConfirmed: false }, req, overrideAccess: true });
+    const tag = userTag(invitation.tag);
+    if (tag === 'owner') throw new APIError('邀请码不能授予站长身份。', 403);
+    const user = await payload.create({ collection: 'users', data: { username: name, nickname: nick, password: pass, role: tagRole(tag), tag, status: 'active', recoveryHash: digest(code), recoveryConfirmed: false }, req, overrideAccess: true });
     await payload.update({ collection: 'invitations', id: invitation.id, data: { used: invitation.used + 1 }, req, overrideAccess: true });
     await payload.create({ collection: 'invitation-uses', data: { invitation: invitation.id, user: user.id }, req, overrideAccess: true });
     return { username: name, recoveryCode: code };
@@ -176,5 +184,21 @@ export async function changeAccount(payload: Payload, user: Actor, action: strin
     const code = secretCode();
     await payload.update({ collection: 'users', id: actor.id, data: { recoveryHash: digest(code), recoveryConfirmed: false }, req, overrideAccess: true });
     return { recoveryCode: code };
+  }, user);
+}
+
+export async function changeUserTag(payload: Payload, user: Actor, targetId: number, requested: unknown) {
+  const next = userTag(requested);
+  if (next === 'owner') throw new APIError('站长身份不可通过网页授予。', 403);
+  return accountTransaction(payload, async req => {
+    const actor = await requireActor(req, user, true);
+    if (!canManageTags(actor.tag)) throw new APIError('没有管理 Tag 的权限。', 403);
+    const target = await payload.findByID({ collection: 'users', id: targetId, req, overrideAccess: true, depth: 0, disableErrors: true });
+    if (!target) throw new APIError('用户不存在。', 404);
+    if (target.id === actor.id || target.tag === 'owner') throw new APIError('不能修改自己或站长的 Tag。', 403);
+    if (actor.tag !== 'owner' && (next === 'admin' || target.tag === 'admin')) throw new APIError('管理员不能授予或管理管理员身份。', 403);
+    if (target.tag === next) return { ok: true };
+    await payload.update({ collection: 'users', id: targetId, data: { tag: next, role: tagRole(next), sessions: [] }, req, overrideAccess: true, depth: 0 });
+    return { ok: true };
   }, user);
 }

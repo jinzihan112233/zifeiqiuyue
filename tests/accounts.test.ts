@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { getPayload, type Payload } from 'payload';
 import { seed } from '../scripts/seed-community';
 import { currentActor, writeContext, type Actor } from '../src/modules/access';
-import { changeAccount, createInvitation, limit, recover, register, revokeInvitation, signIn, password, username, nickname } from '../src/modules/accounts';
+import { changeAccount, changeUserTag, createInvitation, limit, recover, register, revokeInvitation, signIn, password, username, nickname } from '../src/modules/accounts';
 import { createContent } from '../src/modules/community';
 import { safeReturnTo } from '../src/modules/return-to';
 import { bodyBytes } from '../src/modules/http-body';
@@ -95,6 +95,53 @@ test('expired or revoked invitations fail; revocation preserves existing members
   const password = pass(); for (const code of [user.invite.code, invite.code]) await denied(() => register(payload, { username: freshName(), nickname: '读者', password, confirmPassword: password, invitation: code }));
   await denied(() => createInvitation(payload, member, { maxUses: 1, expiresAt: new Date(Date.now() + 99999).toISOString() }));
 });
+test('Tag permissions: invitations and direct updates cannot elevate beyond grantors', async () => {
+  const staff = await actorFor('editor');
+  assert.equal(admin.tag, 'owner');
+  assert.equal(staff.tag, 'admin');
+  await denied(() => createInvitation(payload, staff, { maxUses: 1, expiresAt: new Date(Date.now() + 3600000).toISOString(), tag: 'admin' }), [403]);
+  await denied(() => createInvitation(payload, admin, { maxUses: 1, expiresAt: new Date(Date.now() + 3600000).toISOString(), tag: 'owner' }), [403]);
+  const moonCode = await createInvitation(payload, staff, { maxUses: 1, expiresAt: new Date(Date.now() + 3600000).toISOString(), tag: 'moon' });
+  const moonName = freshName(), secret = pass();
+  await register(payload, { username: moonName, nickname: '蓝色读者', password: secret, confirmPassword: secret, invitation: moonCode.code });
+  const moon = await actorFor(moonName); assert.equal(moon.role, 'member'); assert.equal(moon.tag, 'moon');
+  await denied(() => createContent(payload, moon, { slug: 'staffonly-' + freshName().replaceAll('_','-'), title: '越权', markdown: '正文', kind: 'article' }), [403]);
+  await denied(() => changeUserTag(payload, staff, moon.id, 'admin'), [403]);
+  await denied(() => changeUserTag(payload, staff, admin.id, 'regular'), [403]);
+  await denied(() => changeUserTag(payload, admin, moon.id, 'owner'), [403]);
+  await denied(() => payload.update({ collection: 'users', id: moon.id, user: admin, overrideAccess: true, data: { tag: 'owner', role: 'admin' } }), [403]);
+  await changeUserTag(payload, staff, moon.id, 'regular');
+  assert.equal((await actorFor(moonName)).tag, 'regular');
+  await changeUserTag(payload, admin, moon.id, 'admin');
+  const promoted = await actorFor(moonName); assert.equal(promoted.tag, 'admin'); assert.equal(promoted.role, 'admin');
+  await denied(() => changeUserTag(payload, staff, moon.id, 'regular'), [403]);
+  const grant = await createInvitation(payload, admin, { maxUses: 1, expiresAt: new Date(Date.now() + 3600000).toISOString(), tag: 'admin' });
+  const adminName = freshName(); await register(payload, { username: adminName, nickname: '紫色成员', password: secret, confirmPassword: secret, invitation: grant.code });
+  assert.equal((await actorFor(adminName)).role, 'admin'); assert.equal((await actorFor(adminName)).tag, 'admin');
+});
+test('Tag management HTTP endpoints enforce roles and expose public display tags', async () => {
+  const ownerCookie = await login(accounts.admin.username, accounts.admin.password);
+  const staffCookie = await login(accounts.editor.username, accounts.editor.password);
+  const memberCookie = await login(accounts.membera.username, accounts.membera.password);
+  const session = await http('/api/account/session', 'GET', undefined, ownerCookie);
+  assert.equal((await session.json()).user.tag, 'owner');
+  assert.equal((await http('/api/account/users', 'GET', undefined, memberCookie)).status, 403);
+  const members = await http('/api/account/users', 'GET', undefined, staffCookie);
+  assert.equal(members.status, 200);
+  assert.ok((await members.json()).docs.every((u: Record<string, unknown>) => typeof u.username === 'string' && !('hash' in u) && !('sessions' in u)));
+  assert.equal((await http('/api/account/user-tag/' + member.id, 'POST', { tag: 'admin' }, staffCookie)).status, 403);
+  assert.equal((await http('/api/account/user-tag/' + member.id, 'POST', { tag: 'owner' }, ownerCookie)).status, 403);
+  assert.equal((await http('/api/account/user-tag/' + member.id, 'POST', { tag: 'moon' }, memberCookie)).status, 403);
+  const publicTag = await http('/api/account/public-user/' + member.id);
+  assert.equal(publicTag.status, 200); assert.equal((await publicTag.json()).tag, 'regular');
+  const memberInvite = await http('/api/account/invitations', 'POST', { maxUses: 1, expiresAt: new Date(Date.now() + 3600000).toISOString(), tag: 'admin' }, staffCookie);
+  assert.equal(memberInvite.status, 403);
+  const ownerInvite = await http('/api/account/invitations', 'POST', { maxUses: 1, expiresAt: new Date(Date.now() + 3600000).toISOString(), tag: 'admin' }, ownerCookie);
+  assert.equal(ownerInvite.status, 200);
+  const invite = await ownerInvite.json();
+  const stored = await payload.findByID({ collection: 'invitations', id: invite.id, overrideAccess: true });
+  assert.equal(stored.tag, 'admin');
+});
 test('native generic account creation stays disabled even for administrators', async () => {
   const cookie = await login(accounts.admin.username, accounts.admin.password);
   for (const path of ['/api/users', '/api/users/first-register']) {
@@ -153,7 +200,7 @@ test('personal pages paginate only own records and profile writes ignore privile
   assert.equal((await http('/api/account/activity?type=users', 'GET', undefined, cookie)).status, 400);
   await http('/api/account/nickname', 'POST', { nickname: '新昵称', role: 'admin', status: 'banned', username: 'changed' }, cookie);
   const updated = await actorFor(first.username); assert.equal(updated.role, 'member'); assert.equal(updated.nickname, '新昵称');
-  const publicUser = await http(`/api/account/public-user/${a.id}`).then(response => response.json()); assert.deepEqual(Object.keys(publicUser), ['nickname']);
+  const publicUser = await http(`/api/account/public-user/${a.id}`).then(response => response.json()); assert.deepEqual(Object.keys(publicUser), ['nickname', 'tag']); assert.equal(publicUser.tag, 'regular');
   assert.equal((await http('/api/account/invitations', 'GET', undefined, cookie)).status, 403);
 });
 test('registration, login and recovery reject missing or foreign origins; identity pages are not cached', async () => {

@@ -78,7 +78,7 @@ test('a frozen version stays independent of the changed draft; admin notes remai
   await saveDraft(payload, member, id, { title: '工作稿 B', markdown: '后来修改 B', revision: 1 });
   await decideSubmission(payload, admin, Number(sub.id), 'approved', '公开反馈', 'pending', randomUUID(), '管理员私密备注');
   const own = await managementDetail(payload, member, id, Number(sub.id)); assert.equal(own.submission!.markdown, '冻结 A'); assert.equal(own.draft!.markdown, '后来修改 B'); assert.ok(!JSON.stringify(own).includes('管理员私密备注'));
-  const privileged = await managementDetail(payload, admin, id); assert.ok(JSON.stringify(privileged).includes('管理员私密备注')); await denied(() => managementDetail(payload, other, id)); await denied(() => managementDetail(payload, editor, id));
+  const privileged = await managementDetail(payload, admin, id); assert.ok(JSON.stringify(privileged).includes('管理员私密备注')); await denied(() => managementDetail(payload, other, id)); const staffView = await managementDetail(payload, editor, id); assert.ok(JSON.stringify(staffView).includes('管理员私密备注'));
 });
 test('banned authors cannot be approved and rollback includes audit records', async () => {
   const result = await create(), sub = await submitDraft(payload, member, Number(result.content.id), 1);

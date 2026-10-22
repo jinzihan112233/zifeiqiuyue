@@ -1,7 +1,7 @@
 import { APIError, getPayload } from 'payload';
 import config from '@payload-config';
 import { currentActor } from '../../../../modules/access';
-import { changeAccount, createInvitation, recover, register, revokeInvitation, sameOrigin } from '../../../../modules/accounts';
+import { changeAccount, changeUserTag, createInvitation, recover, register, revokeInvitation, sameOrigin } from '../../../../modules/accounts';
 import { positiveId } from '../../../../modules/community';
 import { bodyBytes } from '../../../../modules/http-body';
 import { ownComments } from '../../../../modules/discussion';
@@ -16,20 +16,25 @@ async function route(request: Request, context: { params: Promise<{ action: stri
     const { user } = await payload.auth({ headers: request.headers });
     const actor = await currentActor(payload, user);
     if (request.method === 'GET') {
-      if (action === 'session') return json({ user: actor ? { id: actor.id, username: actor.username, nickname: actor.nickname, role: actor.role, recoveryNeedsSave: !(actor as unknown as { recoveryConfirmed: boolean }).recoveryConfirmed } : null });
+      if (action === 'session') return json({ user: actor ? { id: actor.id, username: actor.username, nickname: actor.nickname, role: actor.role, tag: actor.tag, recoveryNeedsSave: !(actor as unknown as { recoveryConfirmed: boolean }).recoveryConfirmed } : null });
       if (action === 'public-user') {
         const user = await payload.findByID({ collection: 'users', id: positiveId(id), depth: 0, overrideAccess: true, disableErrors: true });
         if (!user || user.status !== 'active') throw new APIError('用户不可用。', 404);
-        return json({ nickname: user.nickname });
+        return json({ nickname: user.nickname, tag: user.tag });
       }
       if (!actor) throw new APIError('请先登录。', 401);
       const params = new URL(request.url).searchParams;
       const page = Math.min(100000, positiveId(params.get('page') || 1));
+      if (action === 'users') {
+        if (actor.role !== 'admin') throw new APIError('没有操作权限。', 403);
+        const found = await payload.find({ collection: 'users', page, limit: 20, sort: 'username', depth: 0, overrideAccess: true });
+        return json({ page: found.page, totalPages: found.totalPages, docs: found.docs.map(doc => ({ id: doc.id, username: doc.username, nickname: doc.nickname, tag: doc.tag })) });
+      }
       if (action === 'invitations') {
         if (actor.role !== 'admin') throw new APIError('没有操作权限。', 403);
         const found = await payload.find({ collection: 'invitations', page, limit: 20, sort: '-createdAt', depth: 0, overrideAccess: true });
         const uses = await payload.find({ collection: 'invitation-uses', where: { invitation: { in: found.docs.map(doc => doc.id) } }, limit: 2000, depth: 0, overrideAccess: true });
-        return json({ page: found.page, totalPages: found.totalPages, docs: found.docs.map(doc => ({ id: doc.id, maxUses: doc.maxUses, used: doc.used, expiresAt: doc.expiresAt, revoked: doc.revoked, uses: uses.docs.filter(use => use.invitation === doc.id).map(use => ({ userId: use.user, createdAt: use.createdAt })) })) });
+        return json({ page: found.page, totalPages: found.totalPages, docs: found.docs.map(doc => ({ id: doc.id, maxUses: doc.maxUses, used: doc.used, expiresAt: doc.expiresAt, revoked: doc.revoked, tag: doc.tag, uses: uses.docs.filter(use => use.invitation === doc.id).map(use => ({ userId: use.user, createdAt: use.createdAt })) })) });
       }
       if (action === 'activity') {
         const type = params.get('type') || 'drafts';
@@ -54,6 +59,7 @@ async function route(request: Request, context: { params: Promise<{ action: stri
     if (action === 'register') return json(await register(payload, input, request.headers), 201);
     if (action === 'recover') return json(await recover(payload, input, request.headers));
     if (!actor) throw new APIError('请先登录。', 401);
+    if (action === 'user-tag' && id) return json(await changeUserTag(payload, actor, positiveId(id), input.tag));
     if (action === 'invitations') return json(id ? await revokeInvitation(payload, actor, positiveId(id)) : await createInvitation(payload, actor, input));
     if (['nickname', 'password', 'recovery', 'confirm-recovery'].includes(action)) return json(await changeAccount(payload, actor, action, input));
     throw new APIError('操作不存在。', 404);

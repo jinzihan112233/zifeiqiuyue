@@ -38,6 +38,10 @@ npm run prod:start
 
 修改正式域名后，重新运行带 `--origin=` 的准备命令，并重新构建、重启生产应用；它会更新域名但保留既有数据库秘密。
 
+## 用户 Tag 数据库升级
+
+引入四级 Tag 后须先完成备份与恢复检查，停止旧生产应用，然后运行 `npm run prod:migrate`、`npm run prod:build`、`npm run prod:start`。操作见 [用户 Tag 与权限](user-tags.md)。原管理员转为站长，原编辑转为管理员；切勿跳过数据库迁移。
+
 ## 备份与恢复检查
 
 ```powershell

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { defaultMetadata } from '../modules/content-format';
 import { adminAccess, currentActor, guardWrite, isTrustedWrite, ownerAccess, publicMediaIds } from '../modules/access';
 import { loginGuard, username, password, nickname } from '../modules/accounts';
+import { tagOptions } from '../modules/user-tags';
 
 const author = { name: 'author', type: 'relationship', relationTo: 'users', required: true, index: true } as const;
 const content = { name: 'content', type: 'relationship', relationTo: 'contents', required: true, index: true } as const;
@@ -42,12 +43,14 @@ export const Users: CollectionConfig = {
       if (data.nickname !== undefined) data.nickname = nickname(data.nickname);
       if (!isTrustedWrite(req)) {
         if (data.password !== undefined) throw new APIError('请通过账号安全页面修改密码。', 403);
+        if (data.role !== undefined || data.tag !== undefined || data.status !== undefined) throw new APIError('Tag 与权限只能通过授权管理流程修改。', 403);
         const id = await req.transactionID;
         if (!id) throw new APIError('账号更新需要数据库事务。', 500);
         const sessions = req.payload.db.sessions as Record<string, { db: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> } }>;
         await sessions[String(id)].db.execute(sql`SELECT pg_advisory_xact_lock(97124, 0)`);
         if (!await adminAccess({ req })) throw new APIError('禁止创建或修改账号。', 403);
       }
+      if (originalDoc?.tag === 'owner' && (data.tag && data.tag !== 'owner' || data.role && data.role !== 'admin' || data.status === 'banned')) throw new APIError('站长身份不可通过普通管理流程移除。', 403);
       if (originalDoc?.role === 'admin' && (data.role && data.role !== 'admin' || data.status === 'banned')) {
         const others = await req.payload.count({ collection: 'users', where: { and: [{ role: { equals: 'admin' } }, { status: { equals: 'active' } }, { id: { not_equals: originalDoc.id } }] }, overrideAccess: true, req });
         if (!others.totalDocs) throw new APIError('不能移除最后一个管理员。', 409);
@@ -61,6 +64,7 @@ export const Users: CollectionConfig = {
     { name: 'recoveryHash', type: 'text', hidden: true, access: { read: denied, create: denied, update: denied } },
     { name: 'recoveryConfirmed', type: 'checkbox', defaultValue: false, access: { create: denied, update: denied } },
     { name: 'role', type: 'select', required: true, defaultValue: 'member', options: ['member', 'editor', 'admin'] },
+    { name: 'tag', type: 'select', required: true, defaultValue: 'regular', options: tagOptions },
     { name: 'status', type: 'select', required: true, defaultValue: 'active', options: ['active', 'banned'] },
   ],
 };
@@ -123,7 +127,7 @@ export const Home: CollectionConfig = {
 const privateAccess = { ...protectedAccess, read: denied };
 export const Invitations: CollectionConfig = {
   slug: 'invitations', admin: { hidden: true }, access: privateAccess, hooks: protectedHooks,
-  fields: [{ name: 'codeHash', type: 'text', required: true, unique: true, hidden: true }, { name: 'maxUses', type: 'number', required: true }, { name: 'used', type: 'number', required: true, defaultValue: 0 }, { name: 'expiresAt', type: 'date', required: true }, { name: 'revoked', type: 'checkbox', defaultValue: false }, { name: 'creator', type: 'relationship', relationTo: 'users', required: true }],
+  fields: [{ name: 'codeHash', type: 'text', required: true, unique: true, hidden: true }, { name: 'maxUses', type: 'number', required: true }, { name: 'used', type: 'number', required: true, defaultValue: 0 }, { name: 'expiresAt', type: 'date', required: true }, { name: 'revoked', type: 'checkbox', defaultValue: false }, { name: 'tag', type: 'select', required: true, defaultValue: 'regular', options: tagOptions.filter(option => option.value !== 'owner') }, { name: 'creator', type: 'relationship', relationTo: 'users', required: true }],
 };
 export const InvitationUses: CollectionConfig = {
   slug: 'invitation-uses', admin: { hidden: true }, access: privateAccess, hooks: protectedHooks,

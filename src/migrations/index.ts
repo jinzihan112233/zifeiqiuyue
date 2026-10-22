@@ -7,6 +7,8 @@ import * as migration_20261021_113451_publication_management from './20261021_11
 import * as migration_20261021_145839_discussion from './20261021_145839_discussion';
 import * as migration_20261021_153850_annotation_anchors from './20261021_153850_annotation_anchors';
 
+import * as migration_20261021_180000_user_tags from './20261021_180000_user_tags';
+
 export const migrations = [
   {
     up: migration_20261021_041309_initial_community.up,
@@ -48,4 +50,5 @@ export const migrations = [
     down: migration_20261021_153850_annotation_anchors.down,
     name: '20261021_153850_annotation_anchors'
   },
+  { up: migration_20261021_180000_user_tags.up, down: migration_20261021_180000_user_tags.down, name: '20261021_180000_user_tags' },
 ];

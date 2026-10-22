@@ -108,7 +108,7 @@ test('reports deduplicate pending targets, hide reporter details and enforce adm
   const c = await published(), a = await add(c.id), input = {content:c.id,comment:a.id,reason:'举报合成内容'};
   await Promise.all([reportTarget(payload,other,input),reportTarget(payload,other,input)]);
   const list = await reports(payload,admin); const matches=list.items.filter(r=>r.content===c.id); assert.equal(matches.length,1);
-  await denied(()=>reports(payload,member),[403]); await denied(()=>moderate(payload,editor,{...input,action:'hide',revision:1}),[403]);
+  await denied(()=>reports(payload,member),[403]); assert.ok((await reports(payload,editor)).items.some(r=>r.content===c.id));
   assert.ok(!JSON.stringify(await discussion(payload,c.id)).includes('reporter'));
   const r=matches[0]; const action={content:c.id,comment:a.id,report:r.id,reportRevision:1,action:'hide',revision:1,reason:'确认违规'};
   const handled=await Promise.allSettled([moderate(payload,admin,action),moderate(payload,admin,action)]); assert.equal(handled.filter(v=>v.status==='fulfilled').length,1);
@@ -167,7 +167,7 @@ test('banning via moderation revokes sessions and preserves the last-admin invar
   const c=await published(),a=await add(c.id,other);
   try { await moderate(payload,admin,{content:c.id,comment:a.id,action:'ban',reason:'验证封禁'}); await denied(()=>add(c.id,other),[403]); }
   finally { await payload.update({collection:'users',id:other.id,data:{status:'active'},context:writeContext(),overrideAccess:true}); }
-  const root=await add(c.id,admin); await denied(()=>moderate(payload,admin,{content:c.id,comment:root.id,action:'ban',reason:'不能封禁最后管理员'}),[409]);
+  const root=await add(c.id,admin); await denied(()=>moderate(payload,admin,{content:c.id,comment:root.id,action:'ban',reason:'不能封禁最后管理员'}),[403]);
 });
 test('HTTP endpoints enforce sessions, origins, CRUD isolation and private responses', async () => {
   const log=fs.openSync('.local/p6-test-server.log','w'); server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3100'],{env:{...process.env},stdio:['ignore',log,log],windowsHide:true}); fs.closeSync(log);

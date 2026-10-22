@@ -105,11 +105,11 @@ function pagination(value: unknown) {
 function projection(row: Doc, actor?: Actor | null) {
   const visible = !row.deleted && row.moderation === 'visible';
   return { id: Number(row.id), parent: row.parent_id ? Number(row.parent_id) : null, root: row.root_id ? Number(row.root_id) : null,
-    nickname: row.nickname || '成员', body: visible ? row.body : '', html: visible ? commentHTML(row.body) : '',
+    nickname: row.nickname || '成员', tag: row.tag || 'regular', body: visible ? row.body : '', html: visible ? commentHTML(row.body) : '',
     deleted: row.deleted, hidden: row.moderation === 'hidden', revision: Number(row.revision), editedAt: row.edited_at, createdAt: row.created_at,
     own: actor?.id === Number(row.author_id), annotation: visible && row.snapshot_id ? { id: Number(row.annotation_id), snapshot: Number(row.snapshot_id), version: row.version, quote: row.quote } : null };
 }
-const select = `SELECT m.*, u.nickname, a.id AS annotation_id, a.snapshot_id, a.quote, s.stable_id AS version FROM community.comments m
+const select = `SELECT m.*, u.nickname, u.tag, a.id AS annotation_id, a.snapshot_id, a.quote, s.stable_id AS version FROM community.comments m
   JOIN community.users u ON u.id=m.author_id LEFT JOIN community.annotations a ON a.comment_id=m.id LEFT JOIN community.snapshots s ON s.id=a.snapshot_id`;
 export async function discussion(payload: Payload, content: number, pageValue?: unknown, root?: number, actor?: Actor | null) {
   const page = pagination(pageValue), size = 20;
@@ -192,6 +192,7 @@ export async function moderate(payload: Payload, user: Actor, input: Doc) {
       await payload.update({ collection: 'contents', id: contentId, data: { visibility: input.action === 'hide-content' ? 'hidden' : 'public' }, req, overrideAccess: true });
     } else if (input.action === 'ban') {
       const author = await doc(req, 'users', Number(target?.author || content.author));
+      if (author.tag === 'owner' || author.tag === 'admin' && actor.tag !== 'owner') throw new APIError('不能封禁同级管理员或站长。', 403);
       await payload.update({ collection: 'users', id: author.id, data: { status: 'banned', sessions: [] }, req, overrideAccess: true });
     } else if (!report) throw new APIError('请选择待处理举报。', 400);
     if (report) await payload.update({ collection: 'reports', id: report.id, data: { status: input.action === 'dismiss' ? 'dismissed' : 'resolved', revision: report.revision + 1, resolver: actor.id, resolution: reason, resolvedAt: new Date().toISOString() }, req, overrideAccess: true });

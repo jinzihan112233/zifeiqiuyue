@@ -9,6 +9,7 @@ import { Client } from 'pg';
 import { getPayload, jwtSign, type Payload } from 'payload';
 import { seed } from '../scripts/seed-community';
 import { currentActor, writeContext, type Actor } from '../src/modules/access';
+import { changeUserTag } from '../src/modules/accounts';
 import { addAnnotation, createContent, decideSubmission, saveDraft, setVisibility, submitDraft, uploadMedia } from '../src/modules/community';
 import { imageIds, renderMarkdown } from '../src/modules/markdown';
 
@@ -72,9 +73,9 @@ test('generic writes cannot bypass workflow even with overrideAccess', async () 
   await denied(() => payload.update({ collection: 'snapshots', id: snapshot.id, data: { markdown: '偷换' }, user: admin, overrideAccess: true }));
   await denied(() => payload.update({ collection: 'users', id: memberA.id, data: { role: 'admin' }, user: memberA, overrideAccess: false }));
 });
-test('last administrator cannot be demoted or banned and draft versions remain private', async () => {
-  await denied(() => payload.update({ collection: 'users', id: admin.id, user: admin, data: { role: 'member' }, overrideAccess: false }), [409]);
-  await denied(() => payload.update({ collection: 'users', id: admin.id, user: admin, data: { status: 'banned' }, overrideAccess: false }), [409]);
+test('owner cannot be demoted or banned and draft versions remain private', async () => {
+  await denied(() => payload.update({ collection: 'users', id: admin.id, user: admin, data: { role: 'member' }, overrideAccess: false }), [403]);
+  await denied(() => payload.update({ collection: 'users', id: admin.id, user: admin, data: { status: 'banned' }, overrideAccess: false }), [403]);
   const { draft } = await create();
   const versions = await payload.findVersions({ collection: 'drafts', where: { parent: { equals: draft.id } }, overrideAccess: true }); assert.ok(versions.totalDocs > 0);
   const foreign = await payload.findVersions({ collection: 'drafts', where: { parent: { equals: draft.id } }, user: memberB, overrideAccess: false }); assert.equal(foreign.totalDocs, 0);
@@ -87,19 +88,17 @@ test('draft revisions reject stale tabs and foreign authors', async () => {
   await denied(() => saveDraft(payload, memberA, Number(content.id), { title: '旧标签页', markdown: sample, revision: 1 }), [409]);
   await denied(() => saveDraft(payload, memberB, Number(content.id), { title: '冒名', markdown: sample, revision: 2 }));
 });
-test('concurrent administrator demotions preserve an active administrator', async () => {
-  const secondary = await payload.create({ collection: 'users', data: { username: `admin${randomUUID().replaceAll('-', '').slice(0, 12)}`, password: randomUUID() + randomUUID(), nickname: '并发管理验证', role: 'admin', status: 'active' }, context: writeContext(), overrideAccess: true });
+test('owner is protected while an ordinary administrator can lose staff privileges', async () => {
+  const secondary = await payload.create({ collection: 'users', data: { username: 'staff' + randomUUID().replaceAll('-', '').slice(0, 12), password: randomUUID() + randomUUID(), nickname: '管理测试', role: 'admin', tag: 'admin', status: 'active' }, context: writeContext(), overrideAccess: true });
   const actor = (await currentActor(payload, secondary))!;
   try {
-    const results = await Promise.allSettled([
-      payload.update({ collection: 'users', id: admin.id, user: admin, data: { role: 'member' }, overrideAccess: false }),
-      payload.update({ collection: 'users', id: actor.id, user: actor, data: { role: 'member' }, overrideAccess: false }),
-    ]);
-    assert.equal(results.filter(x => x.status === 'fulfilled').length, 1);
-    const remaining = await payload.count({ collection: 'users', where: { and: [{ role: { equals: 'admin' } }, { status: { equals: 'active' } }] }, overrideAccess: true }); assert.equal(remaining.totalDocs, 1);
+    await denied(() => changeUserTag(payload, actor, admin.id, 'regular'));
+    await denied(() => changeUserTag(payload, actor, memberA.id, 'admin'));
+    await changeUserTag(payload, admin, actor.id, 'moon');
+    assert.equal((await payload.findByID({ collection: 'users', id: actor.id, overrideAccess: true })).role, 'member');
+    assert.equal((await payload.findByID({ collection: 'users', id: admin.id, overrideAccess: true })).tag, 'owner');
   } finally {
-    await payload.update({ collection: 'users', id: admin.id, data: { role: 'admin', status: 'active' }, context: writeContext(), overrideAccess: true });
-    await payload.update({ collection: 'users', id: actor.id, data: { role: 'member', status: 'banned' }, context: writeContext(), overrideAccess: true });
+    await payload.update({ collection: 'users', id: actor.id, data: { role: 'member', tag: 'regular', status: 'banned' }, context: writeContext(), overrideAccess: true });
   }
 });
 test('review publishes frozen A while edited B stays private; old public version survives edits', async () => {
@@ -109,9 +108,10 @@ test('review publishes frozen A while edited B stays private; old public version
   const result = await decideSubmission(payload, admin, Number(submission.id), 'approved'); assert.equal(result.snapshot!.markdown, '冻结内容 A');
   const current = await payload.findByID({ collection: 'snapshots', id: result.snapshot!.id, overrideAccess: false }); assert.equal(current.markdown, '冻结内容 A');
 });
-test('editors cannot approve member submissions', async () => {
+test('administrators can approve any member submission, members cannot review', async () => {
   const { content } = await create(); const submission = await submitDraft(payload, memberA, Number(content.id), 1);
-  await denied(() => decideSubmission(payload, editor, Number(submission.id), 'approved'));
+  await denied(() => decideSubmission(payload, memberB, Number(submission.id), 'approved'));
+  await decideSubmission(payload, editor, Number(submission.id), 'approved');
 });
 test('only one pending submission and one concurrent review decision can succeed', async () => {
   const { content } = await create(); const id = Number(content.id);
