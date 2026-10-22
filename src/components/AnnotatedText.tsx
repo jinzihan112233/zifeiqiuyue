@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { annotationHref, annotationTextVersion, anchorRange, findQuoteRanges, rangeAnchor, type Anchor } from '../modules/annotation-text';
 import type { AnnotationItem } from '../modules/annotations';
 import type { PublicArticle } from '../modules/public-reading';
+import { groupAnnotations } from '../modules/annotation-groups';
+import { AnnotationQuote } from './AnnotationQuote';
 
 export type ReaderData = Pick<PublicArticle, 'content' | 'snapshot' | 'annotations'> & Partial<Pick<PublicArticle, 'annotationPagination' | 'versions'>>;
 type SelectionAnchor = Anchor & { snapshot: number; rendererVersion: string };
@@ -21,6 +23,7 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
   const [search, setSearch] = useState(''), [searchPage, setSearchPage] = useState(1);
   const supported = snapshot.rendererVersion === annotationTextVersion, locked = data.content.discussion === 'locked';
   const matches = useMemo(() => { try { return search.trim() ? findQuoteRanges(snapshot.plainText, search, searchPage) : null; } catch { return null; } }, [snapshot.plainText, search, searchPage]);
+  const groups = useMemo(() => groupAnnotations(items), [items]);
   const query = `content=${contentId}&snapshot=${snapshot.id}`;
   const href = (note: AnnotationItem, target = 'body') => annotationHref(readingHref, note.version, note.id, note.comment, target);
   async function load(nextPage = page) {
@@ -122,9 +125,9 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
     } catch (e) { setError((e as Error).message); }
   }
   function backToReading() { window.scrollTo({ top: origin.current, behavior: 'auto' }); article.current?.focus({ preventScroll: true }); }
-  function noteCard(note: AnnotationItem, separate = false) {
+  function noteCard(note: AnnotationItem, separate = false, showQuote = true) {
     return <section key={note.id} className={`note${active?.id === note.id ? ' active-note' : ''}`} id={`${separate ? 'selected' : 'note'}-annotation-${note.id}`} aria-label={`批注 #${note.id}`}>
-      <p className="muted">批注 #{note.id}{separate && ' · 来自直接链接'}</p><blockquote>{note.quote}</blockquote><p>{note.body}</p>
+      <p className="muted">批注 #{note.id}{separate && ' · 来自直接链接'}</p>{showQuote && <AnnotationQuote quote={note.quote} />}<p>{note.body}</p>
       <div className="annotation-buttons"><button type="button" className="quiet" disabled={busy || loading} onClick={() => void locate(note)}>定位原文</button><a href={href(note, 'discussion')}>查看讨论</a></div>
       <a href={href(note)}>独立链接</a>
     </section>;
@@ -159,7 +162,10 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
     </section>
     <aside className="marginalia" aria-labelledby="annotations-heading"><h2 id="annotations-heading">页边批注</h2><button type="button" className="quiet" disabled={busy || loading} onClick={() => void load()}>刷新批注</button>
       {active && !items.some(note => note.id === active.id) && noteCard(active, true)}
-      {items.map(note => noteCard(note))}{!items.length && <p className="muted">{loading ? '正在读取批注…' : '这个版本还没有可见批注。'}</p>}
+      {groups.map(group => group.items.length === 1 ? noteCard(group.items[0]) : <section className="annotation-group" key={group.key} aria-label={'同段原文的 ' + group.items.length + ' 条批注'}>
+        <h3>相关批注 · {group.items.length} 条</h3><AnnotationQuote quote={group.quote} />
+        <div className="annotation-group-items">{group.items.map(item => noteCard(item, false, false))}</div>
+      </section>)}{!items.length && <p className="muted">{loading ? '正在读取批注…' : '这个版本还没有可见批注。'}</p>}
       {pages > 1 && <nav className="annotation-buttons" aria-label="批注分页"><button type="button" disabled={busy || loading || page <= 1} onClick={() => void load(page - 1)}>上一页批注</button><span>第 {page} / {pages} 页</span><button type="button" disabled={busy || loading || page >= pages} onClick={() => void load(page + 1)}>下一页批注</button></nav>}
       {!!data.versions?.some(v => v.stableId !== snapshot.stableId && v.annotations > 0) && <details><summary>其他版本的批注</summary><ul>{data.versions.filter(v => v.stableId !== snapshot.stableId && v.annotations > 0).map(v => <li key={v.stableId}><a href={`${readingHref}?version=${encodeURIComponent(v.stableId)}#annotations-heading`}>{new Date(v.publishedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} · {v.annotations} 条可见批注</a></li>)}</ul></details>}
     </aside>

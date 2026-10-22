@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ArticleDate } from './ArticleDate';
 import { Discussion } from './Discussion';
 import { AnnotatedText, type ReaderData } from './AnnotatedText';
+import { renderIntroMarkdown } from '../modules/intro-markdown';
 
 export function Reader({ contentId, initialData, articleSlug, version, kind = 'article' }: { contentId: string; initialData?: ReaderData; articleSlug?: string; version?: string; kind?: 'article' | 'post' }) {
   const [data, setData] = useState<ReaderData | null>(initialData || null), [error, setError] = useState('');
@@ -23,7 +24,7 @@ export function Reader({ contentId, initialData, articleSlug, version, kind = 'a
   }, [contentId, articleSlug, version]); // eslint-disable-line react-hooks/exhaustive-deps
   return <><p className="reader-back"><a href={articleSlug ? kind === "post" ? "/community" : "/articles" : "/workspace"}>← {articleSlug ? kind === "post" ? "返回社区来信" : "返回全部文章" : "返回发布文章"}</a></p>{error && <p role="alert" className="error">{error}</p>}{data && <>
     <header className="reader-heading"><span className="section-kicker">{data.snapshot.metadata && 'category' in data.snapshot.metadata ? String(data.snapshot.metadata.category || '站方文章') : '站内内容'}</span><h1 className="reader-title">{data.snapshot.title}</h1><p className="reader-date"><ArticleDate metadata={kind === "post" ? { demo: data.snapshot.metadata?.demo } : data.snapshot.metadata || {}} publishedAt={data.snapshot.publishedAt} /></p>{data.content.currentSnapshot !== data.snapshot.id && <p className="demo-note">正在阅读历史版本。<a href={currentHref}>查看当前版本</a></p>}{data.snapshot.metadata?.sourceUrl && <a className="reader-source" href={data.snapshot.metadata.sourceUrl} target="_blank" rel="noopener noreferrer">查看原文来源 ↗</a>}</header>
-    {data.content.kind === 'article' && data.snapshot.metadata?.intro && <section className="reader-optional"><h2>简介</h2><p>{data.snapshot.metadata.intro}</p></section>}
+    {data.content.kind === 'article' && data.snapshot.metadata?.intro && <section className="reader-optional reader-optional--intro" aria-label="文章简介"><h2>简介</h2><div className="reader-intro-markdown" dangerouslySetInnerHTML={{ __html: renderIntroMarkdown(data.snapshot.metadata.intro) }} /></section>}
     <AnnotatedText key={data.snapshot.stableId || data.snapshot.id} data={data} contentId={contentId} publicLayout={!!articleSlug} signedIn={signedIn} loginHref={loginHref} readingHref={currentHref} onUnavailable={() => { setData(null); setError('内容或版本已不可用，批注与引用停止显示。'); }} />
     {data.content.kind === 'article' && data.snapshot.metadata?.afterword && <section className="reader-optional"><h2>后记</h2><p>{data.snapshot.metadata.afterword}</p></section>}
     <Discussion contentId={contentId} loginHref={loginHref} readingHref={currentHref} />

@@ -316,3 +316,73 @@ input,textarea,select{max-width:100%;min-width:0}label{display:block;margin:16px
 .user-tag--owner { color: #b8860b; }
 .user-tag-name { font-weight: 650; }
 .user-tag-label { font-size: .78em; font-weight: 500; }
+
+/* Intro stays aligned with the main reading column and uses quiet Markdown typography. */
+.article-page .reader-optional--intro {
+  width: calc(100% - 340px);
+  max-width: none;
+  margin: 18px 0 25px;
+  text-align: left;
+}
+.reader-optional--intro { text-align: left; }
+.reader-optional--intro :is(h2,h3) {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font: 500 15px/1.8 var(--serif);
+}
+.reader-intro-markdown {
+  color: var(--muted);
+  font-size: 15.5px;
+  line-height: 1.9;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.reader-intro-markdown p { margin: 0 0 .65em; white-space: normal; line-height: inherit; }
+.reader-intro-markdown :is(h1,h2,h3,h4,h5,h6) { font-size: 1em; color: inherit; line-height: 1.8; margin: 1em 0 .25em; font-weight: 600; }
+.reader-intro-markdown :is(ul,ol) { padding-left: 1.6em; margin: .6em 0; }
+.reader-intro-markdown blockquote { margin: .65em 0; padding-left: 12px; border-left: 2px solid var(--rule); }
+.reader-intro-markdown :is(a,code) { overflow-wrap: anywhere; }
+.reader-intro-markdown a { color: var(--accent); text-decoration: underline; }
+
+/* A slightly wider marginal column; grouped notes share the quoted selection. */
+.reading-grid { grid-template-columns: minmax(0,1fr) 300px; gap: 40px; }
+.article-page .reader-heading,
+.article-page .reader-back,
+.article-page .version-menu { max-width: calc(100% - 340px); }
+.article-page .discussion { width: calc(100% - 340px); }
+.marginalia { padding-left: 20px; }
+.note { min-width: 0; scroll-margin-top: 24px; }
+.annotation-quote { min-width: 0; margin: 0 0 12px; }
+.annotation-quote blockquote { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 5px; }
+.annotation-quote-toggle {
+  min-height: 36px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.annotation-group { border-top: 1px solid var(--rule); padding: 15px 0 10px; }
+.annotation-group h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.annotation-group-items { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.annotation-group-items .note { min-width: 0; padding: 10px 0; border-top: 1px dashed var(--rule); overflow-wrap: anywhere; }
+.annotation-group-items .note > p { margin: 7px 0; }
+.annotation-group-items .annotation-buttons { align-items: flex-start; gap: 5px; }
+.annotation-group-items .annotation-buttons button,
+.annotation-group-items .annotation-buttons a { font-size: 12px; }
+
+@media (max-width: 1000px) {
+  .reading-grid { grid-template-columns: minmax(0,700px); gap: 24px; }
+  .article-page .reader-optional--intro { width: 100%; max-width: 700px; margin-inline: auto; }
+  .article-page .reader-heading,
+  .article-page .reader-back,
+  .article-page .version-menu { max-width: 700px; }
+  .article-page .discussion { width: 100%; }
+  .marginalia { padding-left: 0; }
+}
+@media (max-width: 440px) {
+  .annotation-group-items { grid-template-columns: minmax(0,1fr); }
+  .reader-intro-markdown { font-size: 15px; }
+}
