@@ -222,7 +222,7 @@ export async function uploadMedia(payload: Payload, user: Actor, bytes: Buffer, 
   });
 }
 
-export async function addAnnotation(payload: Payload, user: Actor, input: { snapshot?: unknown; start?: unknown; end?: unknown; quote?: unknown; body?: unknown; requestKey?: unknown; rendererVersion?: unknown; prefix?: unknown; suffix?: unknown }, headers?: Headers) {
+export async function addAnnotation(payload: Payload, user: Actor, input: { snapshot?: unknown; start?: unknown; end?: unknown; quote?: unknown; body?: unknown; requestKey?: unknown; rendererVersion?: unknown; prefix?: unknown; suffix?: unknown; shareToDiscussion?: unknown }, headers?: Headers) {
   const snapshotId = positiveId(input.snapshot), initial = await getDoc<Snapshot>(payload, 'snapshots', snapshotId);
   return transaction(payload, user, Number(initial.content), async (req, actor) => {
     const snapshot = await getDoc<Snapshot & { rendererVersion: string }>(payload, 'snapshots', snapshotId, req);
@@ -230,12 +230,16 @@ export async function addAnnotation(payload: Payload, user: Actor, input: { snap
     if (content.visibility !== 'public') throw new APIError('内容不可用。', 404);
     if (input.rendererVersion !== undefined && input.rendererVersion !== snapshot.rendererVersion) throw new APIError('定位规则已变化，请刷新后重新选择文字；保留当前评论输入。', 409);
     if (input.requestKey !== undefined && (typeof input.requestKey !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(input.requestKey))) throw new APIError('提交标识无效。', 400);
+    if (input.shareToDiscussion !== undefined && typeof input.shareToDiscussion !== 'boolean') throw new APIError('分享到评论区的选项无效。', 400);
+    const shareToDiscussion = input.shareToDiscussion === true;
     const key = input.requestKey ? `${actor.id}:annotation:${input.requestKey}` : undefined;
-    const hash = crypto.createHash('sha256').update(JSON.stringify([snapshotId,input.start,input.end,input.quote,input.body,input.rendererVersion,input.prefix,input.suffix])).digest('hex');
+    const fields = [snapshotId,input.start,input.end,input.quote,input.body,input.rendererVersion,input.prefix,input.suffix];
+    const hash = crypto.createHash('sha256').update(JSON.stringify([...fields,shareToDiscussion])).digest('hex');
+    const legacyHash = shareToDiscussion ? null : crypto.createHash('sha256').update(JSON.stringify(fields)).digest('hex');
     if (key) {
       const prior = await payload.find({ collection: 'comments', where: { requestKey: { equals: key } }, req, overrideAccess: true, depth: 0, limit: 1 });
       if (prior.docs[0]) {
-        if (prior.docs[0].requestHash !== hash) throw new APIError('提交标识已用于其他批注。', 409);
+        if (prior.docs[0].requestHash !== hash && prior.docs[0].requestHash !== legacyHash) throw new APIError('提交标识已用于其他批注。', 409);
         const notes = await payload.find({ collection: 'annotations', where: { comment: { equals: prior.docs[0].id } }, req, overrideAccess: true, depth: 0, limit: 1 });
         return notes.docs[0];
       }
@@ -246,6 +250,6 @@ export async function addAnnotation(payload: Payload, user: Actor, input: { snap
     if (input.quote !== anchor.quote || input.prefix !== undefined && input.prefix !== anchor.prefix || input.suffix !== undefined && input.suffix !== anchor.suffix) throw new APIError('引用或上下文与发布版本不一致。', 400);
     verifyAnnotationText(snapshot.html, snapshot.plainText, anchor.start, anchor.end);
     const comment = await annotationComment(req, actor, content.id, input.body, key, hash, headers);
-    return payload.create({ collection: 'annotations', data: { comment: comment.id, content: content.id, snapshot: snapshotId, author: actor.id, ...anchor }, req, overrideAccess: true, depth: 0 });
+    return payload.create({ collection: 'annotations', data: { comment: comment.id, content: content.id, snapshot: snapshotId, author: actor.id, ...anchor, shareToDiscussion }, req, overrideAccess: true, depth: 0 });
   });
 }

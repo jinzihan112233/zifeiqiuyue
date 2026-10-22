@@ -123,7 +123,7 @@ export async function discussion(payload: Payload, content: number, pageValue?: 
     if (!rows[0]) throw new APIError('讨论不可用。', 404);
     thread = projection(rows[0], actor);
   }
-  const condition = root ? 'm.root_id=$2' : 'm.parent_id IS NULL';
+  const condition = root ? 'm.root_id=$2' : "m.parent_id IS NULL AND NOT EXISTS (SELECT 1 FROM community.annotations a WHERE a.comment_id=m.id AND a.share_to_discussion=false)";
   const args = root ? [content, root] : [content];
   const { rows: counts } = await payload.db.pool.query(`SELECT count(*)::int AS total FROM community.comments m WHERE ${filter} AND ${condition}`, args);
   const pages = Math.max(1, Math.ceil(counts[0].total / size));

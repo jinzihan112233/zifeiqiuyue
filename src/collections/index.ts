@@ -114,7 +114,7 @@ export const Annotations: CollectionConfig = {
     doc.body = comment && !comment.deleted && comment.moderation === 'visible' ? comment.body : '';
     return doc;
   }] },
-  fields: [author, content, { name: 'comment', type: 'relationship', relationTo: 'comments', required: true, unique: true }, { name: 'snapshot', type: 'relationship', relationTo: 'snapshots', required: true }, { name: 'start', type: 'number', required: true }, { name: 'end', type: 'number', required: true }, { name: 'quote', type: 'textarea', required: true }, { name: 'prefix', type: 'text' }, { name: 'suffix', type: 'text' }, { name: 'body', type: 'textarea', virtual: true }],
+  fields: [author, content, { name: 'comment', type: 'relationship', relationTo: 'comments', required: true, unique: true }, { name: 'snapshot', type: 'relationship', relationTo: 'snapshots', required: true }, { name: 'start', type: 'number', required: true }, { name: 'end', type: 'number', required: true }, { name: 'quote', type: 'textarea', required: true }, { name: 'prefix', type: 'text' }, { name: 'suffix', type: 'text' }, { name: 'shareToDiscussion', type: 'checkbox', defaultValue: false, required: true }, { name: 'body', type: 'textarea', virtual: true }],
 };
 export const Quotes: CollectionConfig = {
   slug: 'quotes', hooks: protectedHooks, access: { ...protectedAccess, read: async ({ req }): Promise<boolean | Where> => await adminAccess({ req }) ? true : { and: [{ enabled: { equals: true } }, { or: [{ content: { exists: false } }, { 'content.visibility': { equals: 'public' } }] }] } },

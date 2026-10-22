@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { before, beforeEach, after, test } from 'node:test';
 import { parseHTML } from 'linkedom';
@@ -9,7 +9,7 @@ import { annotationHref, annotationTextVersion, anchorRange, domPointOffset, fin
 import { annotationDetail, annotationList, annotationMarkers } from '../src/modules/annotations';
 import { renderMarkdown, verifyAnnotationText } from '../src/modules/markdown';
 import { addAnnotation, createContent, submitDraft, decideSubmission, saveDraft, setVisibility } from '../src/modules/community';
-import { addComment, changeComment, moderate, ownComments } from '../src/modules/discussion';
+import { addComment, changeComment, discussion, moderate, ownComments } from '../src/modules/discussion';
 import { publicArticle } from '../src/modules/public-reading';
 import { purgeContent, purgePreview } from '../src/modules/content-management';
 import { currentActor, writeContext, type Actor } from '../src/modules/access';
@@ -91,6 +91,34 @@ test('retries create one immutable anchor and one root comment',async()=>{
   const c=await publish(),value=input(c.snapshot);const [a,b]=await Promise.all([addAnnotation(payload,member,value),addAnnotation(payload,member,value)]);assert.equal(a.id,b.id);
   for(const fields of [{start:0},{end:1},{author:other.id},{quote:'偷换引用'},{prefix:'偷换上下文'},{snapshot:Number(c.snapshot.id)+1}])await assert.rejects(()=>payload.update({collection:'annotations',id:a.id,data:fields,context:writeContext(),overrideAccess:true}));
   await changeComment(payload,member,Number(a.comment),{revision:1,body:'只修改批注评论'});assert.equal((await annotationDetail(payload,c.id,Number(c.snapshot.id),a.id)).body,'只修改批注评论');
+});
+
+test('annotations stay near the cited text unless the author opts in to the main comment feed', async () => {
+  const c = await publish();
+  const ordinary = await addComment(payload, member, { content: c.id, body: '普通主评论', requestKey: randomUUID() });
+  const standalone = await addAnnotation(payload, member, input(c.snapshot));
+  const shared = await addAnnotation(payload, member, { ...input(c.snapshot, '重复句。', true), shareToDiscussion: true });
+  const feed = await discussion(payload, c.id);
+  assert.equal(feed.total, 2);
+  assert.deepEqual(feed.items.map(item => item.id), [Number(ordinary.id), Number(shared.comment)]);
+  assert.equal((await discussion(payload, c.id, '1', Number(standalone.comment))).thread?.id, standalone.comment);
+  assert.equal((await annotationDetail(payload, c.id, Number(c.snapshot.id), Number(standalone.id))).body, 'P7 合成批注');
+  const reply = await addComment(payload, other, { content: c.id, parent: Number(standalone.comment), body: '仅批注内讨论', requestKey: randomUUID() });
+  assert.equal((await discussion(payload, c.id, '1', Number(standalone.comment))).items[0].id, reply.id);
+  assert.equal((await discussion(payload, c.id)).total, 2);
+  const { rows } = await payload.db.pool.query('SELECT id,share_to_discussion FROM community.annotations WHERE id=ANY($1::integer[]) ORDER BY id',[[standalone.id, shared.id]]);
+  assert.deepEqual(rows.map(row => row.share_to_discussion), [false,true]);
+});
+
+test('sharing option rejects nonbooleans and a retry cannot silently change the destination', async () => {
+  const c = await publish(), value = input(c.snapshot);
+  await denied(() => addAnnotation(payload, member, { ...value, shareToDiscussion: 'true' }), [400]);
+  const saved = await addAnnotation(payload, member, { ...value, shareToDiscussion: false });
+  assert.equal((await addAnnotation(payload, member, { ...value, shareToDiscussion: false })).id, saved.id);
+  const oldHash = createHash('sha256').update(JSON.stringify([value.snapshot, value.start, value.end, value.quote, value.body, value.rendererVersion, value.prefix, value.suffix])).digest('hex');
+  await payload.db.pool.query('UPDATE community.comments SET request_hash=$2 WHERE id=$1',[saved.comment,oldHash]);
+  assert.equal((await addAnnotation(payload, member, value)).id, saved.id);
+  await denied(() => addAnnotation(payload, member, { ...value, shareToDiscussion: true }), [409]);
 });
 test('database rejects a positioning record attached to a reply or another content',async()=>{
   const c=await publish(),d=await publish();const root=await addComment(payload,member,{content:c.id,body:'根',requestKey:randomUUID()}),reply=await addComment(payload,member,{content:c.id,parent:root.id,body:'回复',requestKey:randomUUID()});

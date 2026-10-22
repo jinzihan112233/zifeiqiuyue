@@ -22,6 +22,7 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
   const article = useRef<HTMLElement>(null), composer = useRef<HTMLTextAreaElement>(null), cleanHighlight = useRef<() => void>(() => {}), ignoreSelection = useRef(false), requestKey = useRef(''), sending = useRef(false), origin = useRef(0);
   const [items, setItems] = useState(data.annotations), [page, setPage] = useState(1), [pages, setPages] = useState(data.annotationPagination?.pages || 1);
   const [selection, setSelection] = useState<SelectionAnchor | null>(null), [candidate, setCandidate] = useState<Anchor | null>(null), [body, setBody] = useState('');
+  const [shareToDiscussion, setShareToDiscussion] = useState(false);
   const [active, setActive] = useState<AnnotationItem | null>(null), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(''), [searchPage, setSearchPage] = useState(1);
   const [markers, setMarkers] = useState<AnnotationMarker[]>(data.annotations);
@@ -236,13 +237,13 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
         try {
           if (selection.snapshot !== snapshot.id || selection.rendererVersion !== snapshot.rendererVersion) throw new Error('阅读版本已变化，请保留输入并重新选择原文。');
           requestKey.current ||= crypto.randomUUID();
-          const response = await fetch('/api/community/annotation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selection, body, requestKey: requestKey.current }) });
+          const response = await fetch('/api/community/annotation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...selection, body, shareToDiscussion, requestKey: requestKey.current }) });
           const value = await response.json(); if (!response.ok) throw new Error(value.error || '批注保存失败。');
-          requestKey.current = ''; setBody(''); setSelection(null); setNotice('批注已发布。');
+          requestKey.current = ''; setBody(''); setShareToDiscussion(false); setSelection(null); setNotice(shareToDiscussion ? '批注已发布，并已分享到文章评论区。' : '批注已发布，仅在原文批注中展示。');
           await load(1);
           try { const note = await read(`annotation-detail?${query}&id=${value.id}`); setActive(note); paint(note, false); } catch { setError('批注已发布，但读取或定位更新失败，请刷新批注。'); }
         } catch (e) { setError((e as Error).message); } finally { sending.current = false; setBusy(false); }
-      }}><h3>为这段原文写批注</h3><blockquote>{selection.quote}</blockquote><label>批注内容<textarea ref={composer} value={body} maxLength={5000} required rows={5} onChange={e => { setBody(e.target.value); requestKey.current = ''; }} /></label><div className="annotation-buttons"><button disabled={busy || locked}>发布批注</button><button type="button" disabled={busy} onClick={() => { setSelection(null); setCandidate(null); backToReading(); }}>取消并保留草稿</button></div></form>}
+      }}><h3>为这段原文写批注</h3><blockquote>{selection.quote}</blockquote><label>批注内容<textarea ref={composer} value={body} maxLength={5000} required rows={5} onChange={e => { setBody(e.target.value); requestKey.current = ''; }} /></label><label className="annotation-share-option"><input type="checkbox" checked={shareToDiscussion} disabled={busy} onChange={event => { setShareToDiscussion(event.target.checked); requestKey.current = ''; }} /> 同时分享到文章评论区（可选，默认不分享）</label><div className="annotation-buttons"><button disabled={busy || locked}>发布批注</button><button type="button" disabled={busy} onClick={() => { setSelection(null); setCandidate(null); backToReading(); }}>取消并保留草稿</button></div></form>}
       {body && !selection && <p role="status">上一份尚未发布的输入已保留。重新选择引用后可继续编辑。</p>}
       {body && <button type="button" className="quiet" onClick={() => {
         const file = new Blob([`发布版本：${snapshot.stableId}\n渲染规则：${snapshot.rendererVersion}\n原文引用：${selection?.quote || ''}\n\n批注正文：\n${body}`], { type: 'text/plain;charset=utf-8' });
