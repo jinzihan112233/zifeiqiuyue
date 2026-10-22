@@ -7,7 +7,7 @@ import { pageNumber, publicArchive, publicArticle } from '@/modules/public-readi
 import { bodyBytes } from '@/modules/http-body';
 import { cleanupMedia, frozenPreview, managementDetail, managementList, purgeContent, purgePreview } from '@/modules/content-management';
 import { addComment, changeComment, discussion, moderate, reports, reportTarget } from '@/modules/discussion';
-import { annotationDetail, annotationList } from '@/modules/annotations';
+import { annotationDetail, annotationList, annotationMarkers } from '@/modules/annotations';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,10 +20,10 @@ async function handle(request: Request, { params }: { params: Promise<{ action: 
     const actor = await currentActor(payload, auth.user);
     const url = new URL(request.url);
     if (request.method === 'GET') {
-      if (action === 'annotations' || action === 'annotation-detail') {
+      if (action === 'annotations' || action === 'annotation-detail' || action === 'annotation-markers') {
         for (const name of ['content','snapshot','page','id']) if (url.searchParams.getAll(name).length > 1) throw new APIError('批注参数无效。', 400);
         const content = positiveId(url.searchParams.get('content')), snapshot = positiveId(url.searchParams.get('snapshot'));
-        return json(action === 'annotations' ? await annotationList(payload, content, snapshot, url.searchParams.get('page')) : await annotationDetail(payload, content, snapshot, url.searchParams.get('id')));
+        return json(action === 'annotations' ? await annotationList(payload, content, snapshot, url.searchParams.get('page')) : action === 'annotation-markers' ? await annotationMarkers(payload, content, snapshot, url.searchParams.get('page')) : await annotationDetail(payload, content, snapshot, url.searchParams.get('id')));
       }
       if (action === 'discussion') return json(await discussion(payload, positiveId(url.searchParams.get('content')), url.searchParams.get('page'), url.searchParams.has('root') ? positiveId(url.searchParams.get('root')) : undefined, actor));
       if (action === 'reports') { if (!actor) throw new APIError('请先登录。', 401); return json(await reports(payload, actor, url.searchParams.get('page'), url.searchParams.get('status') || 'pending')); }

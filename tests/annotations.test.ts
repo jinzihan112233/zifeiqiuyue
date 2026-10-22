@@ -6,7 +6,7 @@ import { before, beforeEach, after, test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import { getPayload, type Payload } from 'payload';
 import { annotationHref, annotationTextVersion, anchorRange, domPointOffset, findQuoteRanges, rangeAnchor, textAnchor } from '../src/modules/annotation-text';
-import { annotationDetail, annotationList } from '../src/modules/annotations';
+import { annotationDetail, annotationList, annotationMarkers } from '../src/modules/annotations';
 import { renderMarkdown, verifyAnnotationText } from '../src/modules/markdown';
 import { addAnnotation, createContent, submitDraft, decideSubmission, saveDraft, setVisibility } from '../src/modules/community';
 import { addComment, changeComment, moderate, ownComments } from '../src/modules/discussion';
@@ -102,12 +102,15 @@ test('pagination reaches beyond 100 annotations and direct lookup does not depen
   await payload.db.pool.query(`WITH notes AS(INSERT INTO community.comments(author_id,content_id,body,created_at,updated_at) SELECT $1,$2,'分页合成批注',now(),now() FROM generate_series(1,104) RETURNING id)
     INSERT INTO community.annotations(author_id,content_id,snapshot_id,comment_id,start,"end",quote,prefix,suffix,created_at,updated_at) SELECT $1,$2,$3,id,$4,$5,$6,$7,$8,now(),now() FROM notes`,[member.id,c.id,c.snapshot.id,value.start,value.end,value.quote,value.prefix,value.suffix]);
   const first=await annotationList(payload,c.id,Number(c.snapshot.id),'1'),last=await annotationList(payload,c.id,Number(c.snapshot.id),'6');assert.equal(first.total,105);assert.equal(first.items.length,20);assert.equal(last.items.length,5);
+  const highlights=await annotationMarkers(payload,c.id,Number(c.snapshot.id),'1');assert.equal(highlights.total,105);assert.equal(highlights.items.length,105);
+  assert.deepEqual(Object.keys(highlights.items[0]).sort(),['comment','end','id','quote','snapshot','start','version']);
+  assert.equal(highlights.items[0].quote,value.quote);await denied(()=>annotationMarkers(payload,c.id,Number(c.snapshot.id),'2'),[404]);
   assert.equal((await annotationDetail(payload,c.id,Number(c.snapshot.id),last.items[4].id)).id,last.items[4].id);assert.equal(first.items[0].id,Number(note.id));
   await denied(()=>annotationList(payload,c.id,Number(c.snapshot.id),'7'),[404]);
 });
 test('snapshot and content scoping prevents cross-version and cross-content lookups',async()=>{
   const c=await publish(),d=await publish(),note=await addAnnotation(payload,member,input(c.snapshot));
-  await denied(()=>annotationDetail(payload,d.id,Number(c.snapshot.id),note.id),[404]);await denied(()=>annotationDetail(payload,c.id,Number(d.snapshot.id),note.id),[404]);await denied(()=>annotationList(payload,c.id,Number(d.snapshot.id)),[404]);
+  await denied(()=>annotationDetail(payload,d.id,Number(c.snapshot.id),note.id),[404]);await denied(()=>annotationDetail(payload,c.id,Number(d.snapshot.id),note.id),[404]);await denied(()=>annotationList(payload,c.id,Number(d.snapshot.id)),[404]);await denied(()=>annotationMarkers(payload,d.id,Number(c.snapshot.id)),[404]);
 });
 test('new publication does not move annotations and old-version counts remain visible',async()=>{
   const c=await publish(),note=await addAnnotation(payload,member,input(c.snapshot,'重复句。',true));

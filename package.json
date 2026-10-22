@@ -40,7 +40,7 @@
     "content:roundtrip": "node --env-file=.env.local --import tsx scripts/content-roundtrip.ts",
     "test:reading": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/reading.test.ts",
     "test:accounts": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/accounts.test.ts",
-    "test:annotations": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/annotations.test.ts tests/annotation-groups.test.ts",
+    "test:annotations": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/annotations.test.ts tests/annotation-groups.test.ts tests/comment-ui.test.ts",
     "test:discussion": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/discussion.test.ts",
     "test:publication": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/publication.test.ts",
     "content:replay-purges": "node --env-file=.env.local --import tsx scripts/replay-purges.ts",

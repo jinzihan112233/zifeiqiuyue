@@ -42,6 +42,8 @@ test('article and post comments support continuing replies and immutable parent/
     const c = await published(kind), a = await add(c.id), b = await add(c.id, other, Number(a.id)), d = await add(c.id, member, Number(b.id));
     assert.equal((await raw(Number(d.id))).root, a.id); assert.equal((await raw(Number(d.id))).parent, b.id);
     const result = await discussion(payload, c.id, '1', Number(a.id), member); assert.equal(result.items.length, 2); assert.equal(result.thread!.id, a.id); assert.ok(result.thread!.own);
+    assert.equal(result.thread!.replyCount,2);assert.equal(result.items[0].replyToNickname,member.nickname);
+    assert.equal(result.items[0].replyToExcerpt,'合成评论 🌙');assert.equal(result.items[1].replyToNickname,other.nickname);
     const stranger = await published(); await denied(() => add(stranger.id, member, Number(a.id)), [400]);
     for (const data of [{ parent: d.id }, { root: d.id }, { author: other.id }, { content: stranger.id }]) await assert.rejects(() => payload.update({ collection: 'comments', id: a.id, data, context: writeContext(), overrideAccess: true }));
     await payload.db.pool.query('DELETE FROM community.auth_limits');
@@ -76,7 +78,7 @@ test('hidden edits remain hidden and a hidden parent retains visible descendants
   const c = await published(), a = await add(c.id), b = await add(c.id, other, Number(a.id));
   await moderate(payload, admin, { content: c.id, comment: a.id, action: 'hide', revision: 1, reason: '合成违规样例' });
   await changeComment(payload, member, Number(a.id), { revision: 2, body: 'HIDDEN-P6-EDIT' });
-  const result = await discussion(payload, c.id, '1', Number(a.id)); assert.equal(result.thread!.body, ''); assert.ok(!JSON.stringify(result).includes('HIDDEN-P6-EDIT')); assert.equal(result.items[0].id, b.id);
+  const result = await discussion(payload, c.id, '1', Number(a.id)); assert.equal(result.thread!.body, ''); assert.ok(!JSON.stringify(result).includes('HIDDEN-P6-EDIT'));assert.equal(result.items[0].replyToNickname,null);assert.equal(result.items[0].replyToExcerpt,null); assert.equal(result.items[0].id, b.id);
   await denied(() => add(c.id, member, Number(a.id)), [400]);
   await moderate(payload, admin, { content: c.id, comment: a.id, action: 'restore', revision: 3, reason: '确认可见' }); assert.equal((await discussion(payload, c.id, '1', Number(a.id))).thread!.body, 'HIDDEN-P6-EDIT');
 });
@@ -107,8 +109,8 @@ test('calendar-day and shared-IP counters enforce maxima and expired counters re
 test('reports deduplicate pending targets, hide reporter details and enforce admin-only handling', async () => {
   const c = await published(), a = await add(c.id), input = {content:c.id,comment:a.id,reason:'举报合成内容'};
   await Promise.all([reportTarget(payload,other,input),reportTarget(payload,other,input)]);
-  const list = await reports(payload,admin); const matches=list.items.filter(r=>r.content===c.id); assert.equal(matches.length,1);
-  await denied(()=>reports(payload,member),[403]); assert.ok((await reports(payload,editor)).items.some(r=>r.content===c.id));
+  const {rows:matches}=await payload.db.pool.query('SELECT id FROM community.reports WHERE content_id=$1 AND comment_id=$2 AND status=$3',[c.id,a.id,'pending']); assert.equal(matches.length,1);
+  await denied(()=>reports(payload,member),[403]); await reports(payload,editor);
   assert.ok(!JSON.stringify(await discussion(payload,c.id)).includes('reporter'));
   const r=matches[0]; const action={content:c.id,comment:a.id,report:r.id,reportRevision:1,action:'hide',revision:1,reason:'确认违规'};
   const handled=await Promise.allSettled([moderate(payload,admin,action),moderate(payload,admin,action)]); assert.equal(handled.filter(v=>v.status==='fulfilled').length,1);
@@ -116,7 +118,7 @@ test('reports deduplicate pending targets, hide reporter details and enforce adm
 });
 test('dismissal, content reports and audit records form a full handling loop', async () => {
   const c=await published(); await reportTarget(payload,member,{content:c.id,reason:'内容举报'});
-  const r=(await reports(payload,admin)).items.find(r=>r.content===c.id)!;
+  const r=(await payload.find({collection:'reports',where:{content:{equals:c.id}},limit:1,overrideAccess:true,depth:0})).docs[0]!;
   await moderate(payload,admin,{content:c.id,report:r.id,reportRevision:r.revision,action:'dismiss',reason:'检查无违规'});
   assert.equal((await payload.findByID({collection:'reports',id:r.id,overrideAccess:true})).status,'dismissed');
   await reportTarget(payload,member,{content:c.id,reason:'新的待处理举报'});
@@ -155,7 +157,7 @@ test('annotation retries create one comment and one positioning record', async (
 });
 test('sensitive purge invalidates preview on discussion changes and scrubs reports and audit context', async () => {
   const c=await published(), marker=`P6-SENSITIVE-${randomUUID()}`,a=await add(c.id,member,undefined,marker);
-  await reportTarget(payload,other,{content:c.id,comment:a.id,reason:marker}); const r=(await reports(payload,admin)).items.find(r=>r.content===c.id)!;
+  await reportTarget(payload,other,{content:c.id,comment:a.id,reason:marker}); const {rows:[r]}=await payload.db.pool.query('SELECT id FROM community.reports WHERE content_id=$1 AND comment_id=$2 AND status=$3',[c.id,a.id,'pending']); assert.ok(r);
   await moderate(payload,admin,{content:c.id,comment:a.id,report:r.id,reportRevision:1,action:'hide',revision:1,reason:marker});
   const preview=await purgePreview(payload,admin,c.id); await changeComment(payload,member,Number(a.id),{revision:2,body:marker+'修改'});
   await denied(()=>purgeContent(payload,admin,c.id,{token:preview.token,confirm:'永久清除',reason:'合成清除'}),[409]);

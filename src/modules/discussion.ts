@@ -105,12 +105,12 @@ function pagination(value: unknown) {
 function projection(row: Doc, actor?: Actor | null) {
   const visible = !row.deleted && row.moderation === 'visible';
   return { id: Number(row.id), parent: row.parent_id ? Number(row.parent_id) : null, root: row.root_id ? Number(row.root_id) : null,
-    nickname: row.nickname || '成员', tag: row.tag || 'regular', body: visible ? row.body : '', html: visible ? commentHTML(row.body) : '',
+    nickname: row.nickname || '成员', tag: row.tag || 'regular', replyToNickname: row.reply_to_nickname || null, replyToTag: row.reply_to_tag || null, replyToExcerpt: row.reply_to_excerpt || null, replyCount: Number(row.reply_count || 0), body: visible ? row.body : '', html: visible ? commentHTML(row.body) : '',
     deleted: row.deleted, hidden: row.moderation === 'hidden', revision: Number(row.revision), editedAt: row.edited_at, createdAt: row.created_at,
     own: actor?.id === Number(row.author_id), annotation: visible && row.snapshot_id ? { id: Number(row.annotation_id), snapshot: Number(row.snapshot_id), version: row.version, quote: row.quote } : null };
 }
-const select = `SELECT m.*, u.nickname, u.tag, a.id AS annotation_id, a.snapshot_id, a.quote, s.stable_id AS version FROM community.comments m
-  JOIN community.users u ON u.id=m.author_id LEFT JOIN community.annotations a ON a.comment_id=m.id LEFT JOIN community.snapshots s ON s.id=a.snapshot_id`;
+const select = `SELECT m.*, u.nickname, u.tag, CASE WHEN p.deleted=false AND p.moderation='visible' THEN pu.nickname ELSE NULL END AS reply_to_nickname, CASE WHEN p.deleted=false AND p.moderation='visible' THEN pu.tag ELSE NULL END AS reply_to_tag, CASE WHEN p.deleted=false AND p.moderation='visible' THEN left(p.body, 72) ELSE NULL END AS reply_to_excerpt, (SELECT count(*)::int FROM community.comments sub WHERE sub.root_id=m.id) AS reply_count, a.id AS annotation_id, a.snapshot_id, a.quote, s.stable_id AS version FROM community.comments m
+  JOIN community.users u ON u.id=m.author_id LEFT JOIN community.comments p ON p.id=m.parent_id LEFT JOIN community.users pu ON pu.id=p.author_id LEFT JOIN community.annotations a ON a.comment_id=m.id LEFT JOIN community.snapshots s ON s.id=a.snapshot_id`;
 export async function discussion(payload: Payload, content: number, pageValue?: unknown, root?: number, actor?: Actor | null) {
   const page = pagination(pageValue), size = 20;
   const parent = await payload.findByID({ collection: 'contents', id: content, overrideAccess: true, depth: 0, disableErrors: true });

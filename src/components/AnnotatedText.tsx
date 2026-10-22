@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { annotationHref, annotationTextVersion, anchorRange, findQuoteRanges, rangeAnchor, type Anchor } from '../modules/annotation-text';
-import type { AnnotationItem } from '../modules/annotations';
+import type { AnnotationItem, AnnotationMarker } from '../modules/annotations';
 import type { PublicArticle } from '../modules/public-reading';
 import { groupAnnotations, placeAnnotationNotes } from '../modules/annotation-groups';
 import { AnnotationQuote } from './AnnotationQuote';
+import { AnnotationPopover } from './AnnotationPopover';
 
 export type ReaderData = Pick<PublicArticle, 'content' | 'snapshot' | 'annotations'> & Partial<Pick<PublicArticle, 'annotationPagination' | 'versions'>>;
 type SelectionAnchor = Anchor & { snapshot: number; rendererVersion: string };
@@ -23,6 +24,11 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
   const [selection, setSelection] = useState<SelectionAnchor | null>(null), [candidate, setCandidate] = useState<Anchor | null>(null), [body, setBody] = useState('');
   const [active, setActive] = useState<AnnotationItem | null>(null), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(''), [searchPage, setSearchPage] = useState(1);
+  const [markers, setMarkers] = useState<AnnotationMarker[]>(data.annotations);
+  const [markerRefresh, setMarkerRefresh] = useState(0);
+  const publicGroups = useMemo(() => groupAnnotations(markers), [markers]);
+  const markedRanges = useRef<{ note: AnnotationMarker; range: Range }[]>([]);
+  const [popup, setPopup] = useState<{ notes: AnnotationMarker[]; x: number; y: number } | null>(null);
   const supported = snapshot.rendererVersion === annotationTextVersion, locked = data.content.discussion === 'locked';
   const matches = useMemo(() => { try { return search.trim() ? findQuoteRanges(snapshot.plainText, search, searchPage) : null; } catch { return null; } }, [snapshot.plainText, search, searchPage]);
   const groups = useMemo(() => groupAnnotations(items).sort((a, b) =>
@@ -62,6 +68,46 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
     schedule();
     return () => { cancelled = true; cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener('resize', schedule); };
   }, [groups, publicLayout, snapshot.id, snapshot.plainText, snapshot.rendererVersion, supported]);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMarkers() {
+      try {
+        const collection: AnnotationMarker[] = [];
+        for (let markerPage = 1; markerPage <= 100; markerPage++) {
+          const batch: { items: AnnotationMarker[]; pages: number } = await read('annotation-markers?content=' + contentId + '&snapshot=' + snapshot.id + '&page=' + markerPage);
+          collection.push(...batch.items);
+          if (markerPage >= batch.pages) { if (!cancelled) setMarkers(collection); return; }
+        }
+      } catch { /* Fall back to the current page; never invent or show hidden annotations. */ }
+    }
+    void loadMarkers();
+    return () => { cancelled = true; };
+  }, [contentId, snapshot.id, markerRefresh]);
+  useEffect(() => {
+    const node = article.current;
+    if (!node || !supported) return;
+    const ranges: { note: AnnotationMarker; range: Range }[] = [];
+    for (const note of markers) {
+      try { ranges.push({ note, range: anchorRange(node, note, snapshot.plainText, snapshot.rendererVersion) }); }
+      catch { /* Old anchors remain available in the index. */ }
+    }
+    markedRanges.current = ranges;
+    if (typeof Highlight !== 'undefined' && CSS.highlights) {
+      CSS.highlights.set('reader-public-annotations', new Highlight(...ranges.map(item => item.range)));
+    }
+    return () => { markedRanges.current = []; CSS.highlights?.delete('reader-public-annotations'); };
+  }, [markers, snapshot.plainText, snapshot.rendererVersion, supported]);
+  function openAt(note: AnnotationMarker, x: number, y: number) {
+    const group = publicGroups.find(group => group.items.some(item => item.id === note.id));
+    setPopup({ notes: group?.items || [note], x, y });
+  }
+  function annotatedPoint(x: number, y: number) {
+    const matching = markedRanges.current.filter(({ range }) =>
+      Array.from(range.getClientRects()).some(rect => rect.width > 0 && rect.height > 0 &&
+        x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom));
+    matching.sort((a, b) => (a.note.end - a.note.start) - (b.note.end - b.note.start));
+    return matching[0]?.note || null;
+  }
   const query = `content=${contentId}&snapshot=${snapshot.id}`;
   const href = (note: AnnotationItem, target = 'body') => annotationHref(readingHref, note.version, note.id, note.comment, target);
   async function load(nextPage = page) {
@@ -71,6 +117,7 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
       try { result = await read(`annotations?${query}&page=${nextPage}`); }
       catch (e) { if (nextPage > 1 && (e as { status: number }).status === 404) result = await read(`annotations?${query}&page=1`); else throw e; }
       setItems(result.items); setPage(result.page); setPages(result.pages);
+      setMarkerRefresh(count => count + 1);
       if (active) { try { setActive(await read(`annotation-detail?${query}&id=${active.id}`)); } catch { cleanHighlight.current(); setActive(null); } }
     } catch (e) {
       setItems([]); setActive(null); cleanHighlight.current(); setError((e as Error).message);
@@ -166,13 +213,18 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
   function noteCard(note: AnnotationItem, separate = false, showQuote = true) {
     return <section key={note.id} className={`note${active?.id === note.id ? ' active-note' : ''}`} id={`${separate ? 'selected' : 'note'}-annotation-${note.id}`} aria-label={`批注 #${note.id}`}>
       <p className="muted">批注 #{note.id}{separate && ' · 来自直接链接'}</p>{showQuote && <AnnotationQuote quote={note.quote} />}<p>{note.body}</p>
-      <div className="annotation-buttons"><button type="button" className="quiet" disabled={busy || loading} onClick={() => void locate(note)}>定位原文</button><a href={href(note, 'discussion')}>查看讨论</a></div>
+      <div className="annotation-buttons"><button type="button" className="quiet" disabled={busy || loading} onClick={() => void locate(note)}>定位原文</button><button type="button" className="quiet" onClick={event => { const rect = event.currentTarget.getBoundingClientRect(); openAt(note, rect.left, rect.bottom); }}>查看讨论</button></div>
       <a href={href(note)}>独立链接</a>
     </section>;
   }
-  return <div className={publicLayout ? 'reading-grid' : 'reader-grid'}>
+  return <><div className={publicLayout ? 'reading-grid' : 'reader-grid'}>
     <section>
-      <article id="annotation-body" ref={article} tabIndex={0} aria-label="正文阅读区域" onPointerDown={() => { ignoreSelection.current = false; }} onKeyDown={() => { ignoreSelection.current = false; }} className={publicLayout ? 'reader-body' : 'prose'} dangerouslySetInnerHTML={{ __html: snapshot.html }} />
+      <article id="annotation-body" ref={article} tabIndex={0} aria-label="正文阅读区域" onPointerDown={() => { ignoreSelection.current = false; }} onKeyDown={() => { ignoreSelection.current = false; }} className={publicLayout ? 'reader-body' : 'prose'} onClick={event => {
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed || (event.target instanceof Element && event.target.closest('a,button'))) return;
+        const note = annotatedPoint(event.clientX, event.clientY);
+        if (note) openAt(note, event.clientX, event.clientY);
+      }} onPointerMove={event => { if (article.current) article.current.style.cursor = annotatedPoint(event.clientX, event.clientY) ? 'pointer' : 'text'; }} dangerouslySetInnerHTML={{ __html: snapshot.html }} />
       <div className="annotation-actions">{signedIn ? <button type="button" disabled={!supported || locked || busy} onMouseDown={e => e.preventDefault()} onClick={pick}>为选中文字写批注</button> : <a href={loginHref}>登录后为文字写批注</a>}</div>
       {locked && <p role="status">讨论已锁定，不能新增批注。</p>}
       {!supported && <p role="status">此版本的定位规则暂不支持，仍可阅读正文、引用和评论。</p>}
@@ -209,5 +261,5 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
       {pages > 1 && <nav className="annotation-buttons" aria-label="批注分页"><button type="button" disabled={busy || loading || page <= 1} onClick={() => void load(page - 1)}>上一页批注</button><span>第 {page} / {pages} 页</span><button type="button" disabled={busy || loading || page >= pages} onClick={() => void load(page + 1)}>下一页批注</button></nav>}
       {!!data.versions?.some(v => v.stableId !== snapshot.stableId && v.annotations > 0) && <details><summary>其他版本的批注</summary><ul>{data.versions.filter(v => v.stableId !== snapshot.stableId && v.annotations > 0).map(v => <li key={v.stableId}><a href={`${readingHref}?version=${encodeURIComponent(v.stableId)}#annotations-heading`}>{new Date(v.publishedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} · {v.annotations} 条可见批注</a></li>)}</ul></details>}
     </aside>
-  </div>;
+  </div>{popup && <AnnotationPopover notes={popup.notes} x={popup.x} y={popup.y} contentId={contentId} loginHref={loginHref} readingHref={readingHref} onClose={() => setPopup(null)} />}</>;
 }
