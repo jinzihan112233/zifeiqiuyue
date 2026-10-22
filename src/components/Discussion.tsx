@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { contentAPI as api } from './content-client';
 import { annotationHref } from '../modules/annotation-text';
+import { AnnotationQuote } from './AnnotationQuote';
 import { UserTagName } from './UserTagName';
 import type { UserTag } from '../modules/user-tags';
 
@@ -44,7 +45,7 @@ export function Discussion({ contentId, loginHref, readingHref }: { contentId: s
   function row(note: Comment) {
     return <article className={`discussion-note${note.parent ? ' discussion-reply' : ''}`} id={`comment-${note.id}`} key={note.id}>
       <p className="discussion-meta"><UserTagName nickname={note.nickname} tag={note.tag} /> · #{note.id}{note.parent && ` · 回复 #${note.parent}`} · <time dateTime={note.createdAt}>{new Date(note.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</time>{note.editedAt && ' · 已编辑'}</p>
-      {note.deleted ? <p className="muted">作者已删除这条评论。</p> : note.hidden ? <p className="muted">这条评论已被管理员隐藏。</p> : <>{note.annotation && <blockquote>{note.annotation.quote}<a href={annotationHref(readingHref, note.annotation.version, note.annotation.id, note.root || note.id, 'discussion')}>阅读批注对应版本</a></blockquote>}<div className="comment-prose" dangerouslySetInnerHTML={{ __html: note.html }} /></>}
+      {note.deleted ? <p className="muted">作者已删除这条评论。</p> : note.hidden ? <p className="muted">这条评论已被管理员隐藏。</p> : <>{note.annotation && <div className="discussion-annotation"><p className="discussion-annotation-label">批注引用原文</p><AnnotationQuote quote={note.annotation.quote} /><a className="discussion-annotation-link" href={annotationHref(readingHref, note.annotation.version, note.annotation.id, note.root || note.id, 'discussion')}>阅读批注对应版本</a></div>}<div className="comment-prose" dangerouslySetInnerHTML={{ __html: note.html }} /></>}
       <div className="discussion-actions">
         {!root && <button type="button" disabled={busy} onClick={() => { setRoot(note.id); setPage(1); setReply(null); }}>展开讨论</button>}
         {user && !note.deleted && <>

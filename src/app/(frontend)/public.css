@@ -386,3 +386,50 @@ input,textarea,select{max-width:100%;min-width:0}label{display:block;margin:16px
   .annotation-group-items { grid-template-columns: minmax(0,1fr); }
   .reader-intro-markdown { font-size: 15px; }
 }
+
+/* Compact quote excerpts both beside articles and inside discussion threads. */
+.annotation-quote blockquote {
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.7;
+  text-align: left;
+}
+.discussion-annotation {
+  margin: 12px 0 17px;
+  padding: 10px 14px 12px;
+  border-left: 2px solid var(--rule);
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: left;
+}
+.discussion-annotation-label {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.discussion-annotation .annotation-quote { margin-bottom: 5px; }
+.discussion-annotation .annotation-quote blockquote {
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.discussion-annotation .discussion-annotation-link {
+  display: inline-block;
+  font-size: 13px;
+  margin-top: 4px;
+}
+/* Desktop-only: quote-anchored cards are placed at their source line where space allows. */
+.marginalia-list--aligned { position: relative; }
+.marginalia-list--aligned > .marginalia-entry {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+@media (max-width: 1000px) {
+  .marginalia-list--aligned > .marginalia-entry { position: static; }
+  .marginalia-list--aligned { min-height: 0 !important; }
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { groupAnnotations, previewAnnotationQuote } from '../src/modules/annotation-groups';
+import { groupAnnotations, previewAnnotationQuote, placeAnnotationNotes } from '../src/modules/annotation-groups';
 import { renderIntroMarkdown } from '../src/modules/intro-markdown';
 
 const note = (id: number, start: number, end: number, snapshot = 1) =>
@@ -29,9 +29,9 @@ test('short quotes are complete; long and multiline quotes reveal their full tex
   assert.deepEqual(previewAnnotationQuote('简短的原文'), { text: '简短的原文', truncated: false });
   const long = previewAnnotationQuote('长'.repeat(150));
   assert.equal(long.truncated, true);
-  assert.ok(long.text.length <= 73);
+  assert.ok(Array.from(long.text).length <= 29);
   assert.equal(previewAnnotationQuote('第一行\n第二行\n第三行\n第四行').truncated, true);
-  assert.equal(previewAnnotationQuote('😀'.repeat(100)).text, '😀'.repeat(72) + '…');
+  assert.equal(previewAnnotationQuote('😀'.repeat(100)).text, '😀'.repeat(28) + '…');
 });
 
 test('introduction Markdown formats emphasis while escaping raw HTML and dangerous links', () => {
@@ -41,4 +41,11 @@ test('introduction Markdown formats emphasis while escaping raw HTML and dangero
   assert.match(html, /<br>/);
   assert.doesNotMatch(html, /<script>|href="javascript:/);
   assert.match(html, /&lt;script&gt;/);
+});
+
+test('marginal card layout aligns with quote line when possible and prevents overlap', () => {
+  const placed = placeAnnotationNotes([{ anchor: 80, height: 40 }, { anchor: 92, height: 60 }, { anchor: 350, height: 30 }]);
+  assert.deepEqual(placed.tops, [80, 132, 350]);
+  assert.equal(placed.height, 380);
+  assert.deepEqual(placeAnnotationNotes([{ anchor: -40, height: 10 }, { anchor: 5, height: 15 }]).tops, [0, 22]);
 });

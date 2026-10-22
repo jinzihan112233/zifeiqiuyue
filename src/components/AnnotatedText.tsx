@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { annotationHref, annotationTextVersion, anchorRange, findQuoteRanges, rangeAnchor, type Anchor } from '../modules/annotation-text';
 import type { AnnotationItem } from '../modules/annotations';
 import type { PublicArticle } from '../modules/public-reading';
-import { groupAnnotations } from '../modules/annotation-groups';
+import { groupAnnotations, placeAnnotationNotes } from '../modules/annotation-groups';
 import { AnnotationQuote } from './AnnotationQuote';
 
 export type ReaderData = Pick<PublicArticle, 'content' | 'snapshot' | 'annotations'> & Partial<Pick<PublicArticle, 'annotationPagination' | 'versions'>>;
@@ -16,6 +16,8 @@ async function read(action: string) {
 }
 export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHref, readingHref, onUnavailable }: { data: ReaderData; contentId: string; publicLayout: boolean; signedIn: boolean; loginHref: string; readingHref: string; onUnavailable: () => void }) {
   const { snapshot } = data;
+  const noteRegion = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<{ tops: number[]; height: number } | null>(null);
   const article = useRef<HTMLElement>(null), composer = useRef<HTMLTextAreaElement>(null), cleanHighlight = useRef<() => void>(() => {}), ignoreSelection = useRef(false), requestKey = useRef(''), sending = useRef(false), origin = useRef(0);
   const [items, setItems] = useState(data.annotations), [page, setPage] = useState(1), [pages, setPages] = useState(data.annotationPagination?.pages || 1);
   const [selection, setSelection] = useState<SelectionAnchor | null>(null), [candidate, setCandidate] = useState<Anchor | null>(null), [body, setBody] = useState('');
@@ -23,7 +25,43 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
   const [search, setSearch] = useState(''), [searchPage, setSearchPage] = useState(1);
   const supported = snapshot.rendererVersion === annotationTextVersion, locked = data.content.discussion === 'locked';
   const matches = useMemo(() => { try { return search.trim() ? findQuoteRanges(snapshot.plainText, search, searchPage) : null; } catch { return null; } }, [snapshot.plainText, search, searchPage]);
-  const groups = useMemo(() => groupAnnotations(items), [items]);
+  const groups = useMemo(() => groupAnnotations(items).sort((a, b) =>
+    Math.min(...a.items.map(item => item.start)) - Math.min(...b.items.map(item => item.start))), [items]);
+  const aligned = publicLayout && supported && placement?.tops.length === groups.length ? placement : null;
+  useLayoutEffect(() => {
+    const region = noteRegion.current, articleNode = article.current;
+    if (!publicLayout || !supported || !region || !articleNode) return;
+    let frame = 0, cancelled = false;
+    const wide = window.matchMedia('(min-width: 1001px)');
+    function measure() {
+      if (cancelled || !region || !articleNode) return;
+      if (!wide.matches || !groups.length) { setPlacement(null); return; }
+      const cards = Array.from(region.querySelectorAll<HTMLElement>(':scope > .marginalia-entry'));
+      if (cards.length !== groups.length) return;
+      const regionTop = region.getBoundingClientRect().top;
+      const measurements = cards.map((card, i) => {
+        const note = groups[i].items.reduce((first, item) => item.start < first.start ? item : first);
+        let anchor = 0;
+        try {
+          const range = anchorRange(articleNode, note, snapshot.plainText, snapshot.rendererVersion);
+          const line = Array.from(range.getClientRects()).find(rect => rect.width > 0 && rect.height > 0);
+          anchor = (line || range.getBoundingClientRect()).top - regionTop;
+        } catch { /* Keep a stale reference visible. */ }
+        return { anchor, height: card.getBoundingClientRect().height };
+      });
+      const next = placeAnnotationNotes(measurements);
+      setPlacement(old => old && old.height === next.height && old.tops.length === next.tops.length &&
+        old.tops.every((top, i) => top === next.tops[i]) ? old : next);
+    }
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    const observer = new ResizeObserver(schedule);
+    observer.observe(articleNode);
+    region.querySelectorAll(':scope > .marginalia-entry').forEach(node => observer.observe(node));
+    window.addEventListener('resize', schedule);
+    void document.fonts?.ready.then(() => { if (!cancelled) schedule(); });
+    schedule();
+    return () => { cancelled = true; cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener('resize', schedule); };
+  }, [groups, publicLayout, snapshot.id, snapshot.plainText, snapshot.rendererVersion, supported]);
   const query = `content=${contentId}&snapshot=${snapshot.id}`;
   const href = (note: AnnotationItem, target = 'body') => annotationHref(readingHref, note.version, note.id, note.comment, target);
   async function load(nextPage = page) {
@@ -162,10 +200,12 @@ export function AnnotatedText({ data, contentId, publicLayout, signedIn, loginHr
     </section>
     <aside className="marginalia" aria-labelledby="annotations-heading"><h2 id="annotations-heading">页边批注</h2><button type="button" className="quiet" disabled={busy || loading} onClick={() => void load()}>刷新批注</button>
       {active && !items.some(note => note.id === active.id) && noteCard(active, true)}
-      {groups.map(group => group.items.length === 1 ? noteCard(group.items[0]) : <section className="annotation-group" key={group.key} aria-label={'同段原文的 ' + group.items.length + ' 条批注'}>
+      <div ref={noteRegion} className={aligned ? 'marginalia-list marginalia-list--aligned' : 'marginalia-list'} style={aligned ? { minHeight: aligned.height } : undefined}>
+      {groups.map((group, index) => <div key={group.key} className="marginalia-entry" style={aligned ? { top: aligned.tops[index] } : undefined}>
+        {group.items.length === 1 ? noteCard(group.items[0]) : <section className="annotation-group" aria-label={'同段原文的 ' + group.items.length + ' 条批注'}>
         <h3>相关批注 · {group.items.length} 条</h3><AnnotationQuote quote={group.quote} />
         <div className="annotation-group-items">{group.items.map(item => noteCard(item, false, false))}</div>
-      </section>)}{!items.length && <p className="muted">{loading ? '正在读取批注…' : '这个版本还没有可见批注。'}</p>}
+      </section>}</div>)}</div>{!items.length && <p className="muted">{loading ? '正在读取批注…' : '这个版本还没有可见批注。'}</p>}
       {pages > 1 && <nav className="annotation-buttons" aria-label="批注分页"><button type="button" disabled={busy || loading || page <= 1} onClick={() => void load(page - 1)}>上一页批注</button><span>第 {page} / {pages} 页</span><button type="button" disabled={busy || loading || page >= pages} onClick={() => void load(page + 1)}>下一页批注</button></nav>}
       {!!data.versions?.some(v => v.stableId !== snapshot.stableId && v.annotations > 0) && <details><summary>其他版本的批注</summary><ul>{data.versions.filter(v => v.stableId !== snapshot.stableId && v.annotations > 0).map(v => <li key={v.stableId}><a href={`${readingHref}?version=${encodeURIComponent(v.stableId)}#annotations-heading`}>{new Date(v.publishedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} · {v.annotations} 条可见批注</a></li>)}</ul></details>}
     </aside>

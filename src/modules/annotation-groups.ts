@@ -35,10 +35,22 @@ export function groupAnnotations<T extends AnnotationRange>(items: readonly T[])
 }
 
 /** Keep short quotes intact; expand lengthy or heavily line-broken quotes on demand. */
-export function previewAnnotationQuote(quote: string, maxCharacters = 72, maxLines = 3) {
+export function previewAnnotationQuote(quote: string, maxCharacters = 28, maxLines = 2) {
   const characters = Array.from(quote);
   const lines = quote.split('\n');
   if (characters.length <= maxCharacters && lines.length <= maxLines) return { text: quote, truncated: false };
   const linePreview = lines.slice(0, maxLines).join('\n');
   return { text: Array.from(linePreview).slice(0, maxCharacters).join('') + '…', truncated: true };
+}
+
+/** Place marginal notes close to their quoted line without allowing cards to overlap. */
+export function placeAnnotationNotes(entries: readonly { anchor: number; height: number }[], gap = 12) {
+  const tops: number[] = [];
+  let bottom = 0;
+  for (const entry of entries) {
+    const top = Math.max(0, Number.isFinite(entry.anchor) ? entry.anchor : 0, bottom ? bottom + gap : 0);
+    tops.push(top);
+    bottom = top + Math.max(0, entry.height);
+  }
+  return { tops, height: bottom };
 }
