@@ -44,7 +44,8 @@
     "test:discussion": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/discussion.test.ts",
     "test:publication": "node --env-file=.env.local --import tsx --test --test-force-exit --test-concurrency=1 tests/publication.test.ts",
     "content:replay-purges": "node --env-file=.env.local --import tsx scripts/replay-purges.ts",
-    "content:audit": "node --env-file=.env.local --import tsx scripts/audit-publication.ts"
+    "content:audit": "node --env-file=.env.local --import tsx scripts/audit-publication.ts",
+    "test:home-quotes": "node --import tsx --test tests/home-quotes.test.ts"
   },
   "devDependencies": {
     "@types/markdown-it": "14.2.0",

@@ -73,6 +73,7 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
 .quote-item { counter-increment: excerpts; margin: 30px 0 0; padding-top: 18px; border-top: 1px solid var(--rule); }
 .quote-item::before { content: '〇' counter(excerpts, cjk-ideographic); display: block; margin-bottom: 14px; color: var(--accent); font: 11px/1.8 var(--serif); letter-spacing: .15em; }
 .quote-item p { margin: 0 0 14px; font: 400 17px/2.1 var(--serif); letter-spacing: .04em; overflow-wrap: anywhere; }
+.quote-item--oversized p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; overflow: hidden; }
 .quote-item cite { display: block; color: var(--muted); font-size: 11px; line-height: 1.8; font-style: normal; }
 .quotes-ending { margin-top: 35px; color: var(--muted); font: 12px/1.8 var(--serif); letter-spacing: .25em; }
 .page-shell { max-width: 920px; min-height: calc(100vh - 310px); padding-top: 66px; }
@@ -135,7 +136,7 @@ button, a { -webkit-tap-highlight-color: rgba(136, 71, 59, .14); }
   .hero-drawing { right: 4px; width: 290px; opacity: .58; }
   .quotes-column { border-left: 0; border-top: 1px solid var(--rule); padding: 25px 0 0; }
   .quotes-heading h2 { margin: 7px 0; }
-  #quotes-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 25px; }
+  #quotes-list { display: grid; grid-template-columns: repeat(var(--quote-count, 3), minmax(0, 1fr)); gap: 25px; }
   .quote-item { margin-top: 20px; }
   .quotes-ending { display: none; }
   .site-footer { margin-top: 44px; }
